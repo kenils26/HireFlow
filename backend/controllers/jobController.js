@@ -188,12 +188,20 @@ const getJobById = async (req, res) => {
 const applyForJob = async (req, res) => {
   try {
     const { id } = req.params;
-    const { coverLetter } = req.body;
+    const { coverLetterText } = req.body;
 
     if (req.user.role !== 'candidate') {
       return res.status(403).json({
         success: false,
         message: 'Only candidates can apply for jobs'
+      });
+    }
+
+    // Check if resume file is uploaded
+    if (!req.files || !req.files.resume || !req.files.resume[0]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Resume is required. Please upload your resume.'
       });
     }
 
@@ -232,11 +240,28 @@ const applyForJob = async (req, res) => {
       });
     }
 
+    // Get resume file URL
+    const resumeUrl = `/uploads/resumes/${req.files.resume[0].filename}`;
+    
+    // Get cover letter file URL if uploaded
+    let coverLetterUrl = null;
+    let coverLetterTextValue = null;
+    
+    if (req.files.coverLetter && req.files.coverLetter[0]) {
+      // Cover letter uploaded as file
+      coverLetterUrl = `/uploads/cover-letters/${req.files.coverLetter[0].filename}`;
+    } else if (coverLetterText && coverLetterText.trim()) {
+      // Cover letter provided as text
+      coverLetterTextValue = coverLetterText.trim();
+    }
+
     // Create application
     const application = await JobApplication.create({
       jobId: id,
       candidateId: candidate.id,
-      coverLetter: coverLetter || null,
+      resumeUrl: resumeUrl,
+      coverLetter: coverLetterTextValue || null,
+      coverLetterUrl: coverLetterUrl,
       status: 'Applied'
     });
 

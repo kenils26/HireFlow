@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaUser, FaSave, FaSpinner, FaCheckCircle, FaTimesCircle, FaUpload, FaFilePdf } from 'react-icons/fa';
 import { getCurrentUser } from '../../services/authService';
 import { updateCandidateProfile, uploadResume } from '../../services/candidateService';
+import { getFileUrl } from '../../utils/api';
 
 const Profile = () => {
   const [userData, setUserData] = useState(null);
@@ -245,9 +246,7 @@ const Profile = () => {
             <div className="mb-4 p-3 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-2">Current Resume:</p>
               <a
-                href={userData.candidateProfile.resumeUrl.startsWith('http') 
-                  ? userData.candidateProfile.resumeUrl 
-                  : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${userData.candidateProfile.resumeUrl}`}
+                href={getFileUrl(userData.candidateProfile.resumeUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline flex items-center space-x-2"

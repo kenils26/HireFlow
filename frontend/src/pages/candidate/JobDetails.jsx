@@ -8,7 +8,10 @@ import {
   FaBookmark,
   FaBuilding,
   FaArrowLeft,
-  FaCheckCircle
+  FaCheckCircle,
+  FaUpload,
+  FaFile,
+  FaTimes
 } from 'react-icons/fa';
 import { getJobById, applyForJob, toggleSaveJob } from '../../services/jobService';
 import Loading from '../../components/Loading';
@@ -20,8 +23,11 @@ const JobDetails = () => {
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [coverLetter, setCoverLetter] = useState('');
+  const [resumeFile, setResumeFile] = useState(null);
+  const [coverLetterFile, setCoverLetterFile] = useState(null);
+  const [coverLetterText, setCoverLetterText] = useState('');
   const [showApplyModal, setShowApplyModal] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     loadJob();
@@ -55,14 +61,67 @@ const JobDetails = () => {
     }
   };
 
+  const handleResumeFile = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      const maxSize = 10 * 1024 * 1024; // 10MB
+
+      if (!allowedTypes.includes(file.type)) {
+        setError('Invalid resume file type. Please upload PDF, DOC, or DOCX file.');
+        return;
+      }
+
+      if (file.size > maxSize) {
+        setError('Resume file size exceeds 10MB limit.');
+        return;
+      }
+
+      setResumeFile(file);
+      setError('');
+    }
+  };
+
+  const handleCoverLetterFile = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      const maxSize = 10 * 1024 * 1024; // 10MB
+
+      if (!allowedTypes.includes(file.type)) {
+        setError('Invalid cover letter file type. Please upload PDF, DOC, or DOCX file.');
+        return;
+      }
+
+      if (file.size > maxSize) {
+        setError('Cover letter file size exceeds 10MB limit.');
+        return;
+      }
+
+      setCoverLetterFile(file);
+      setCoverLetterText(''); // Clear text if file is uploaded
+      setError('');
+    }
+  };
+
   const handleApply = async () => {
+    setError('');
+    
+    // Validate resume is uploaded
+    if (!resumeFile) {
+      setError('Please upload your resume to apply for this job.');
+      return;
+    }
+
     try {
       setApplying(true);
-      const response = await applyForJob(id, coverLetter);
+      const response = await applyForJob(id, resumeFile, coverLetterFile, coverLetterText);
       if (response.success) {
         setJob(prev => ({ ...prev, isApplied: true, application: response.data.application }));
         setShowApplyModal(false);
-        setCoverLetter('');
+        setResumeFile(null);
+        setCoverLetterFile(null);
+        setCoverLetterText('');
         // Navigate to applications page after successful application
         setTimeout(() => {
           navigate('/applications');
@@ -70,10 +129,18 @@ const JobDetails = () => {
       }
     } catch (error) {
       console.error('Error applying for job:', error);
-      alert(error.response?.data?.message || 'Error applying for job');
+      setError(error.response?.data?.message || 'Error applying for job');
     } finally {
       setApplying(false);
     }
+  };
+
+  const removeResumeFile = () => {
+    setResumeFile(null);
+  };
+
+  const removeCoverLetterFile = () => {
+    setCoverLetterFile(null);
   };
 
   const formatSalary = (min, max, currency = 'USD') => {
@@ -284,23 +351,115 @@ const JobDetails = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Apply for {job.title}</h2>
+            
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Resume Upload - Required */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Resume <span className="text-red-500">*</span>
+              </label>
+              {resumeFile ? (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <FaFile className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm text-gray-700">{resumeFile.name}</span>
+                    <span className="text-xs text-gray-500">
+                      ({(resumeFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </span>
+                  </div>
+                  <button
+                    onClick={removeResumeFile}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <FaTimes className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <label className="block">
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors">
+                    <FaUpload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-1">Click to upload resume</p>
+                    <p className="text-xs text-gray-500">PDF, DOC, DOCX (Max 10MB)</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleResumeFile}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* Cover Letter Upload - Optional */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Cover Letter (Optional)
               </label>
-              <textarea
-                value={coverLetter}
-                onChange={(e) => setCoverLetter(e.target.value)}
-                rows={6}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Tell the employer why you're a good fit for this position..."
-              />
+              
+              {/* Cover Letter File Upload */}
+              {coverLetterFile ? (
+                <div className="mb-3 flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <FaFile className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm text-gray-700">{coverLetterFile.name}</span>
+                    <span className="text-xs text-gray-500">
+                      ({(coverLetterFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </span>
+                  </div>
+                  <button
+                    onClick={removeCoverLetterFile}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <FaTimes className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="mb-3">
+                  <label className="block">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-primary transition-colors">
+                      <FaUpload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+                      <p className="text-xs text-gray-600 mb-1">Upload cover letter as file</p>
+                      <p className="text-xs text-gray-500">PDF, DOC, DOCX (Max 10MB)</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleCoverLetterFile}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              )}
+
+              {/* Cover Letter Text Input - Only show if no file uploaded */}
+              {!coverLetterFile && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-2">Or write your cover letter below:</p>
+                  <textarea
+                    value={coverLetterText}
+                    onChange={(e) => setCoverLetterText(e.target.value)}
+                    rows={6}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Tell the employer why you're a good fit for this position..."
+                  />
+                </div>
+              )}
             </div>
+
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => {
                   setShowApplyModal(false);
-                  setCoverLetter('');
+                  setResumeFile(null);
+                  setCoverLetterFile(null);
+                  setCoverLetterText('');
+                  setError('');
                 }}
                 className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
@@ -308,8 +467,8 @@ const JobDetails = () => {
               </button>
               <button
                 onClick={handleApply}
-                disabled={applying}
-                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+                disabled={applying || !resumeFile}
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {applying ? 'Applying...' : 'Submit Application'}
               </button>

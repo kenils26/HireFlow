@@ -16,6 +16,8 @@ const storage = multer.diskStorage({
     // Organize uploads by type
     if (file.fieldname === 'resume') {
       uploadPath = path.join(uploadDir, 'resumes');
+    } else if (file.fieldname === 'coverLetter') {
+      uploadPath = path.join(uploadDir, 'cover-letters');
     } else if (file.fieldname === 'companyLogo') {
       uploadPath = path.join(uploadDir, 'company-logos');
     } else if (file.fieldname === 'businessProof') {
@@ -39,6 +41,7 @@ const storage = multer.diskStorage({
 const fileFilter = (req, file, cb) => {
   const allowedMimes = {
     resume: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    coverLetter: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
     companyLogo: ['image/png', 'image/jpeg', 'image/jpg'],
     businessProof: ['application/pdf', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
   };

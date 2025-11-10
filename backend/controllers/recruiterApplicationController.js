@@ -1,5 +1,7 @@
 const { JobApplication, Job, Candidate, Recruiter, User, Education, Experience, Skill } = require('../models');
 const { Op } = require('sequelize');
+const path = require('path');
+const fs = require('fs');
 
 // Get all applications for recruiter's jobs
 const getRecruiterApplications = async (req, res) => {
@@ -63,14 +65,14 @@ const getRecruiterApplications = async (req, res) => {
         {
           model: Candidate,
           as: 'candidate',
+          attributes: ['id', 'fullName', 'contactNumber', 'location', 'resumeUrl'],
           include: [
             {
               model: User,
               as: 'user',
               attributes: ['id', 'email']
             }
-          ],
-          attributes: ['id', 'fullName', 'contactNumber', 'location', 'resumeUrl']
+          ]
         }
       ],
       order: [['appliedAt', 'DESC']],
@@ -135,6 +137,15 @@ const getRecruiterApplication = async (req, res) => {
     });
     const jobIds = recruiterJobs.map(job => job.id);
 
+    if (jobIds.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found'
+      });
+    }
+
+    console.log('Looking for application:', { id, jobIds });
+
     const application = await JobApplication.findOne({
       where: {
         id,
@@ -149,6 +160,7 @@ const getRecruiterApplication = async (req, res) => {
         {
           model: Candidate,
           as: 'candidate',
+          attributes: ['id', 'fullName', 'contactNumber', 'location', 'resumeUrl'],
           include: [
             {
               model: User,
@@ -158,6 +170,13 @@ const getRecruiterApplication = async (req, res) => {
           ]
         }
       ]
+    });
+
+    console.log('Application query result:', { 
+      found: !!application, 
+      applicationId: application?.id,
+      jobId: application?.jobId,
+      candidateId: application?.candidateId 
     });
 
     if (!application) {
@@ -192,6 +211,48 @@ const getRecruiterApplication = async (req, res) => {
         }
       ]
     });
+
+    // Log resume URLs for debugging
+    console.log('Recruiter application data:', {
+      applicationId: application.id,
+      applicationResumeUrl: application.resumeUrl,
+      candidateResumeUrl: candidate?.resumeUrl,
+      hasApplicationResume: !!application.resumeUrl,
+      hasCandidateResume: !!candidate?.resumeUrl,
+      applicationData: application.toJSON ? application.toJSON() : application
+    });
+    
+    // Verify resume file exists if resumeUrl is present
+    if (application.resumeUrl || candidate?.resumeUrl) {
+      const resumeUrl = application.resumeUrl || candidate.resumeUrl;
+      let filePath;
+      
+      if (resumeUrl.startsWith('/uploads/resumes/')) {
+        // Full path like /uploads/resumes/filename.pdf
+        filePath = path.join(__dirname, '..', resumeUrl);
+      } else if (resumeUrl.startsWith('/uploads/')) {
+        // Path like /uploads/filename.pdf (incorrect but handle it)
+        filePath = path.join(__dirname, '..', resumeUrl);
+      } else if (resumeUrl.startsWith('/')) {
+        // Just /filename.pdf
+        filePath = path.join(__dirname, '..', 'uploads', 'resumes', resumeUrl.substring(1));
+      } else {
+        // Just filename.pdf
+        filePath = path.join(__dirname, '..', 'uploads', 'resumes', resumeUrl);
+      }
+      
+      const fileExists = fs.existsSync(filePath);
+      console.log('Resume file check:', {
+        resumeUrl,
+        filePath,
+        exists: fileExists,
+        normalizedPath: filePath
+      });
+      
+      if (!fileExists) {
+        console.warn(`Resume file not found at: ${filePath}`);
+      }
+    }
 
     res.json({
       success: true,

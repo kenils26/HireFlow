@@ -10,10 +10,13 @@ import {
   FaUser,
   FaDollarSign,
   FaBuilding,
-  FaArrowLeft
+  FaArrowLeft,
+  FaFile,
+  FaDownload
 } from 'react-icons/fa';
 import { getApplicationStatus } from '../../services/applicationService';
 import Loading from '../../components/Loading';
+import { getFileUrl } from '../../utils/api';
 
 const ApplicationDetail = () => {
   const { id } = useParams();
@@ -285,13 +288,66 @@ const ApplicationDetail = () => {
       </div>
 
 
-      {/* Cover Letter (if exists) */}
-      {application.coverLetter && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Cover Letter</h2>
-          <p className="text-gray-700 whitespace-pre-wrap">{application.coverLetter}</p>
-        </div>
-      )}
+      {/* Application Documents */}
+      <div className="bg-white rounded-xl shadow p-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Application Documents</h2>
+        
+        {/* Resume */}
+        {application.resumeUrl && (
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <FaFile className="w-5 h-5 text-gray-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Resume</p>
+                  <p className="text-xs text-gray-500">Uploaded with application</p>
+                </div>
+              </div>
+              <a
+                href={getFileUrl(application.resumeUrl)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center space-x-2"
+              >
+                <FaDownload className="w-4 h-4" />
+                <span>Download</span>
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Cover Letter File */}
+        {application.coverLetterUrl && (
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <FaFile className="w-5 h-5 text-gray-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Cover Letter</p>
+                  <p className="text-xs text-gray-500">Uploaded as file</p>
+                </div>
+              </div>
+              <a
+                href={getFileUrl(application.coverLetterUrl)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center space-x-2"
+              >
+                <FaDownload className="w-4 h-4" />
+                <span>Download</span>
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Cover Letter Text */}
+        {application.coverLetter && !application.coverLetterUrl && (
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 className="text-sm font-medium text-gray-800 mb-2">Cover Letter</h3>
+            <p className="text-gray-700 whitespace-pre-wrap text-sm">{application.coverLetter}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

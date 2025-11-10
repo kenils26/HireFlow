@@ -29,8 +29,16 @@ const JobApplication = sequelize.define('JobApplication', {
     type: DataTypes.ENUM('Applied', 'Under Review', 'Interview', 'Offer', 'Rejected'),
     defaultValue: 'Applied'
   },
+  resumeUrl: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   coverLetter: {
     type: DataTypes.TEXT,
+    allowNull: true
+  },
+  coverLetterUrl: {
+    type: DataTypes.STRING,
     allowNull: true
   },
   appliedAt: {

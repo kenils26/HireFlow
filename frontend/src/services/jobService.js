@@ -21,9 +21,30 @@ export const getJobById = async (id) => {
 };
 
 // Apply for a job
-export const applyForJob = async (jobId, coverLetter = null) => {
+export const applyForJob = async (jobId, resumeFile, coverLetterFile = null, coverLetterText = null) => {
   try {
-    const response = await api.post(`/jobs/${jobId}/apply`, { coverLetter });
+    const formData = new FormData();
+    
+    // Resume is required
+    if (resumeFile) {
+      formData.append('resume', resumeFile);
+    }
+    
+    // Cover letter file (optional) - if file is provided, use it
+    if (coverLetterFile) {
+      formData.append('coverLetter', coverLetterFile);
+    } else if (coverLetterText) {
+      // If no file, send text as a regular field (will be in req.body.coverLetter)
+      // Note: Multer will ignore non-file fields, so we need to send text separately
+      // For now, we'll handle this by sending text only if no file is provided
+      formData.append('coverLetterText', coverLetterText);
+    }
+    
+    const response = await api.post(`/jobs/${jobId}/apply`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   } catch (error) {
     throw error;

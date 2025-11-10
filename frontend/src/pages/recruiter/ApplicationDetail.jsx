@@ -17,6 +17,7 @@ import {
 import { getRecruiterApplication, updateApplicationStatus } from '../../services/recruiterApplicationService';
 import { createInterview } from '../../services/recruiterInterviewService';
 import Loading from '../../components/Loading';
+import { getFileUrl } from '../../utils/api';
 
 const ApplicationDetail = () => {
   const { id } = useParams();
@@ -43,11 +44,25 @@ const ApplicationDetail = () => {
     try {
       setLoading(true);
       const response = await getRecruiterApplication(id);
+      console.log('API Response:', response);
       if (response.data && response.data.success) {
         setApplicationData(response.data.data);
+        // Debug: Log the application data to check resume URLs
+        console.log('Application data loaded:', {
+          applicationResumeUrl: response.data.data.application?.resumeUrl,
+          candidateResumeUrl: response.data.data.candidate?.resumeUrl,
+          fullData: response.data.data
+        });
+      } else {
+        console.error('Application not found or error in response:', response.data);
       }
     } catch (error) {
       console.error('Error loading application:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
     } finally {
       setLoading(false);
     }
@@ -68,12 +83,98 @@ const ApplicationDetail = () => {
     }
   };
 
-  const handleDownloadResume = () => {
-    if (applicationData?.candidate?.resumeUrl) {
-      const resumeUrl = applicationData.candidate.resumeUrl.startsWith('http')
-        ? applicationData.candidate.resumeUrl
-        : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${applicationData.candidate.resumeUrl}`;
-      window.open(resumeUrl, '_blank');
+  const handleDownloadResume = async () => {
+    // Prioritize application resume (job-specific) over candidate profile resume
+    let resumeUrl = applicationData?.application?.resumeUrl || applicationData?.candidate?.resumeUrl;
+    
+    if (!resumeUrl) {
+      console.error('No resume URL found:', {
+        applicationResumeUrl: applicationData?.application?.resumeUrl,
+        candidateResumeUrl: applicationData?.candidate?.resumeUrl,
+        applicationData
+      });
+      alert('Resume not available for this application.');
+      return;
+    }
+    
+    // Normalize the resume URL - handle cases where it might be just a filename
+    // or already have the full path
+    if (!resumeUrl.startsWith('http') && !resumeUrl.startsWith('/')) {
+      // If it's just a filename, add the full path
+      resumeUrl = `/uploads/resumes/${resumeUrl}`;
+    } else if (!resumeUrl.startsWith('http') && !resumeUrl.includes('/uploads/resumes/') && !resumeUrl.includes('/uploads/cover-letters/')) {
+      // If it starts with / but doesn't have the uploads path, it might be malformed
+      // Check if it looks like just a filename with a leading slash
+      if (resumeUrl.match(/^\/[^/]+\.(pdf|doc|docx)$/i)) {
+        resumeUrl = `/uploads/resumes${resumeUrl}`;
+      }
+    }
+    
+    // Construct the full URL using the utility function
+    const fullUrl = getFileUrl(resumeUrl);
+    
+    console.log('Attempting to download resume:', {
+      originalUrl: applicationData?.application?.resumeUrl || applicationData?.candidate?.resumeUrl,
+      normalizedUrl: resumeUrl,
+      fullUrl: fullUrl,
+      apiUrl: import.meta.env.VITE_API_URL
+    });
+    
+    // Try to open in new tab, if that fails, try to download directly
+    try {
+      // First, verify the file exists by making a HEAD request
+      const response = await fetch(fullUrl, { method: 'HEAD' });
+      if (!response.ok) {
+        console.error('Resume file not found:', response.status, response.statusText);
+        alert(`Resume file not found. Please contact support. (Error: ${response.status})`);
+        return;
+      }
+      
+      const link = document.createElement('a');
+      link.href = fullUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.download = resumeUrl.split('/').pop() || 'resume.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error downloading resume:', error);
+      // Fallback to window.open
+      window.open(fullUrl, '_blank');
+    }
+  };
+
+  const handleDownloadCoverLetter = async () => {
+    if (applicationData?.application?.coverLetterUrl) {
+      let coverLetterUrl = applicationData.application.coverLetterUrl;
+      
+      // Normalize the cover letter URL similar to resume
+      if (!coverLetterUrl.startsWith('http') && !coverLetterUrl.startsWith('/')) {
+        coverLetterUrl = `/uploads/cover-letters/${coverLetterUrl}`;
+      } else if (!coverLetterUrl.startsWith('http') && !coverLetterUrl.includes('/uploads/cover-letters/')) {
+        if (coverLetterUrl.match(/^\/[^/]+\.(pdf|doc|docx)$/i)) {
+          coverLetterUrl = `/uploads/cover-letters${coverLetterUrl}`;
+        }
+      }
+      
+      // Construct the full URL using the utility function
+      const fullUrl = getFileUrl(coverLetterUrl);
+      
+      console.log('Downloading cover letter:', fullUrl);
+      
+      try {
+        const response = await fetch(fullUrl, { method: 'HEAD' });
+        if (!response.ok) {
+          console.error('Cover letter file not found:', response.status);
+          alert(`Cover letter file not found. (Error: ${response.status})`);
+          return;
+        }
+        window.open(fullUrl, '_blank');
+      } catch (error) {
+        console.error('Error downloading cover letter:', error);
+        window.open(fullUrl, '_blank');
+      }
     }
   };
 
@@ -221,13 +322,22 @@ const ApplicationDetail = () => {
 
         {/* Action Buttons */}
         <div className="flex items-center space-x-3 pt-4 border-t border-gray-200">
-          {candidate?.resumeUrl && (
+          <button
+            onClick={handleDownloadResume}
+            disabled={!application?.resumeUrl && !candidate?.resumeUrl}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!application?.resumeUrl && !candidate?.resumeUrl ? 'No resume available' : 'Download resume'}
+          >
+            <FaDownload className="w-4 h-4" />
+            <span>Download Resume</span>
+          </button>
+          {application?.coverLetterUrl && (
             <button
-              onClick={handleDownloadResume}
-              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center space-x-2"
+              onClick={handleDownloadCoverLetter}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
             >
               <FaDownload className="w-4 h-4" />
-              <span>Download Resume</span>
+              <span>Download Cover Letter</span>
             </button>
           )}
           {application.status === 'Applied' && (
@@ -313,10 +423,23 @@ const ApplicationDetail = () => {
       </div>
 
       {/* Cover Letter */}
-      {application.coverLetter && (
+      {(application.coverLetter || application.coverLetterUrl) && (
         <div className="bg-white rounded-xl shadow p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Cover Letter</h2>
-          <p className="text-gray-700 whitespace-pre-wrap">{application.coverLetter}</p>
+          {application.coverLetterUrl ? (
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-sm text-gray-600 mb-3">Cover letter uploaded as file.</p>
+              <button
+                onClick={handleDownloadCoverLetter}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center space-x-2"
+              >
+                <FaDownload className="w-4 h-4" />
+                <span>Download Cover Letter</span>
+              </button>
+            </div>
+          ) : (
+            <p className="text-gray-700 whitespace-pre-wrap">{application.coverLetter}</p>
+          )}
         </div>
       )}
 
