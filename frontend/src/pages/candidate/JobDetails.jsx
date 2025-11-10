@@ -1,0 +1,325 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  FaMapMarkerAlt,
+  FaCalendarAlt,
+  FaUser,
+  FaDollarSign,
+  FaBookmark,
+  FaBuilding,
+  FaArrowLeft,
+  FaCheckCircle
+} from 'react-icons/fa';
+import { getJobById, applyForJob, toggleSaveJob } from '../../services/jobService';
+import Loading from '../../components/Loading';
+
+const JobDetails = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [coverLetter, setCoverLetter] = useState('');
+  const [showApplyModal, setShowApplyModal] = useState(false);
+
+  useEffect(() => {
+    loadJob();
+  }, [id]);
+
+  const loadJob = async () => {
+    try {
+      setLoading(true);
+      const response = await getJobById(id);
+      if (response.success) {
+        setJob(response.data.job);
+      }
+    } catch (error) {
+      console.error('Error loading job:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveJob = async () => {
+    try {
+      setSaving(true);
+      const response = await toggleSaveJob(id);
+      if (response.success) {
+        setJob(prev => ({ ...prev, isSaved: response.data.isSaved }));
+      }
+    } catch (error) {
+      console.error('Error saving job:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleApply = async () => {
+    try {
+      setApplying(true);
+      const response = await applyForJob(id, coverLetter);
+      if (response.success) {
+        setJob(prev => ({ ...prev, isApplied: true, application: response.data.application }));
+        setShowApplyModal(false);
+        setCoverLetter('');
+        // Navigate to applications page after successful application
+        setTimeout(() => {
+          navigate('/applications');
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Error applying for job:', error);
+      alert(error.response?.data?.message || 'Error applying for job');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const formatSalary = (min, max, currency = 'USD') => {
+    if (!min && !max) return 'Not specified';
+    const formatNumber = (num) => {
+      return new Intl.NumberFormat('en-US').format(num);
+    };
+    if (min && max) {
+      return `$${formatNumber(min)} - $${formatNumber(max)}`;
+    }
+    return min ? `$${formatNumber(min)}+` : `Up to $${formatNumber(max)}`;
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  if (loading) {
+    return <Loading />;
+  }
+
+  if (!job) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-gray-600 text-lg">Job not found</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="p-4 space-y-4">
+        {/* Back Button */}
+        <button
+          onClick={() => navigate('/browse-jobs')}
+          className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
+        >
+          <FaArrowLeft className="w-4 h-4" />
+          <span>Back to Jobs</span>
+        </button>
+
+        {/* Job Header */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start space-x-4 flex-1">
+              {job.companyLogoUrl ? (
+                <img
+                  src={job.companyLogoUrl}
+                  alt={job.companyName}
+                  className="w-16 h-16 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+                  <FaBuilding className="w-8 h-8 text-gray-400" />
+                </div>
+              )}
+              <div className="flex-1">
+                <h1 className="text-2xl font-bold text-gray-800 mb-1">{job.title}</h1>
+                <p className="text-lg text-gray-600 mb-3">{job.companyName}</p>
+                <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                  <div className="flex items-center">
+                    <FaMapMarkerAlt className="w-4 h-4 mr-2 text-gray-400" />
+                    {job.location}
+                  </div>
+                  <div className="flex items-center">
+                    <FaCalendarAlt className="w-4 h-4 mr-2 text-gray-400" />
+                    Posted on {formatDate(job.createdAt)}
+                  </div>
+                  <div className="flex items-center">
+                    <FaUser className="w-4 h-4 mr-2 text-gray-400" />
+                    {job.experienceLevel}
+                  </div>
+                  <div className="flex items-center">
+                    <FaDollarSign className="w-4 h-4 mr-2 text-gray-400" />
+                    {formatSalary(job.salaryMin, job.salaryMax, job.salaryCurrency)}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleSaveJob}
+              disabled={saving}
+              className={`p-3 rounded-lg transition-colors ${
+                job.isSaved
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <FaBookmark className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+              job.jobType === 'Full-time' ? 'bg-blue-100 text-blue-700' :
+              job.jobType === 'Part-time' ? 'bg-green-100 text-green-700' :
+              job.jobType === 'Contract' ? 'bg-purple-100 text-purple-700' :
+              'bg-gray-100 text-gray-700'
+            }`}>
+              {job.jobType}
+            </span>
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+              job.workMode === 'Remote' ? 'bg-green-100 text-green-700' :
+              job.workMode === 'Hybrid' ? 'bg-blue-100 text-blue-700' :
+              'bg-gray-100 text-gray-700'
+            }`}>
+              {job.workMode}
+            </span>
+          </div>
+
+          {job.skills && job.skills.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {job.skills.map((skill) => (
+                <span
+                  key={skill.id}
+                  className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded"
+                >
+                  {skill.skillName}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            {job.isApplied ? (
+              <button
+                disabled
+                className="px-6 py-2 bg-green-100 text-green-700 rounded-lg flex items-center space-x-2 cursor-not-allowed"
+              >
+                <FaCheckCircle className="w-5 h-5" />
+                <span>Applied</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowApplyModal(true)}
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              >
+                Apply Now
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Job Description */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Job Description</h2>
+          <div className="prose max-w-none">
+            <p className="text-gray-700 whitespace-pre-line">{job.description}</p>
+          </div>
+        </div>
+
+        {/* Requirements */}
+        {job.requirements && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Requirements</h2>
+            <div className="prose max-w-none">
+              <p className="text-gray-700 whitespace-pre-line">{job.requirements}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Benefits */}
+        {job.benefits && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Benefits</h2>
+            <div className="prose max-w-none">
+              <p className="text-gray-700 whitespace-pre-line">{job.benefits}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Company Info */}
+        {job.recruiter && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">About {job.companyName}</h2>
+            {job.recruiter.industryType && (
+              <p className="text-gray-700 mb-2">
+                <span className="font-medium">Industry:</span> {job.recruiter.industryType}
+              </p>
+            )}
+            {job.recruiter.companySize && (
+              <p className="text-gray-700 mb-2">
+                <span className="font-medium">Company Size:</span> {job.recruiter.companySize}
+              </p>
+            )}
+            {job.recruiter.headquartersLocation && (
+              <p className="text-gray-700 mb-2">
+                <span className="font-medium">Headquarters:</span> {job.recruiter.headquartersLocation}
+              </p>
+            )}
+            {job.recruiter.companyWebsite && (
+              <a
+                href={job.recruiter.companyWebsite}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Visit Company Website
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Apply Modal */}
+      {showApplyModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Apply for {job.title}</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cover Letter (Optional)
+              </label>
+              <textarea
+                value={coverLetter}
+                onChange={(e) => setCoverLetter(e.target.value)}
+                rows={6}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Tell the employer why you're a good fit for this position..."
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowApplyModal(false);
+                  setCoverLetter('');
+                }}
+                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleApply}
+                disabled={applying}
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+              >
+                {applying ? 'Applying...' : 'Submit Application'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default JobDetails;
+
