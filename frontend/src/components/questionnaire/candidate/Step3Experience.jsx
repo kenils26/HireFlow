@@ -3,7 +3,7 @@ import { FaBriefcase } from 'react-icons/fa';
 import ProgressBar from '../ProgressBar';
 import { addExperience, getExperiences, deleteExperience, addSkill, getSkills, deleteSkill } from '../../../services/candidateService';
 
-const Step3Experience = ({ onNext, onBack, currentStep }) => {
+const Step3Experience = ({ userData, onNext, onBack, currentStep, totalSteps = 4 }) => {
   const [experiences, setExperiences] = useState([]);
   const [skills, setSkills] = useState([]);
   const [formData, setFormData] = useState({
@@ -16,11 +16,16 @@ const Step3Experience = ({ onNext, onBack, currentStep }) => {
   const [skillInput, setSkillInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isFresher, setIsFresher] = useState(false);
 
   useEffect(() => {
     loadExperiences();
     loadSkills();
-  }, []);
+    // Check if candidate is a fresher
+    if (userData?.candidateProfile?.isFresher) {
+      setIsFresher(true);
+    }
+  }, [userData]);
 
   const loadExperiences = async () => {
     try {
@@ -56,9 +61,23 @@ const Step3Experience = ({ onNext, onBack, currentStep }) => {
     e.preventDefault();
     setError('');
 
-    if (!formData.companyName || !formData.role || !formData.fromDate) {
+    // Only validate if not a fresher, or if fresher has filled some fields
+    if (!isFresher && (!formData.companyName || !formData.role || !formData.fromDate)) {
       setError('Please fill in all required fields');
       return;
+    }
+
+    // If fresher and fields are empty, don't add experience
+    if (isFresher && (!formData.companyName && !formData.role && !formData.fromDate)) {
+      return;
+    }
+
+    // If fresher has partially filled fields, validate them
+    if (isFresher && (formData.companyName || formData.role || formData.fromDate)) {
+      if (!formData.companyName || !formData.role || !formData.fromDate) {
+        setError('Please fill in all fields if adding an experience');
+        return;
+      }
     }
 
     setLoading(true);
@@ -119,7 +138,7 @@ const Step3Experience = ({ onNext, onBack, currentStep }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-8">
-      <ProgressBar currentStep={currentStep} totalSteps={4} />
+      <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
 
       <div className="text-center mb-6">
         <FaBriefcase className="w-16 h-16 text-primary mx-auto mb-4" />
@@ -127,40 +146,48 @@ const Step3Experience = ({ onNext, onBack, currentStep }) => {
         <p className="text-gray-500 mt-2">Share your professional background</p>
       </div>
 
+      {isFresher && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>You've indicated that you're a fresher.</strong> If you have any internships, projects, or freelance work, you can add them below. Otherwise, you can skip adding experience and proceed to the next step.
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleAddExperience} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Company Name {!isFresher && <span className="text-red-500">*</span>}</label>
           <input
             type="text"
             name="companyName"
-            required
+            required={!isFresher}
             value={formData.companyName}
             onChange={handleChange}
-            placeholder="Enter company"
+            placeholder="Enter company or project name"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Role/Position</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Role/Position {!isFresher && <span className="text-red-500">*</span>}</label>
           <input
             type="text"
             name="role"
-            required
+            required={!isFresher}
             value={formData.role}
             onChange={handleChange}
-            placeholder="Enter role"
+            placeholder="Enter role or project type"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">From Date {!isFresher && <span className="text-red-500">*</span>}</label>
             <input
               type="date"
               name="fromDate"
-              required
+              required={!isFresher}
               value={formData.fromDate}
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"

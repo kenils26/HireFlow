@@ -3,7 +3,7 @@ import { FaGraduationCap } from 'react-icons/fa';
 import ProgressBar from '../ProgressBar';
 import { addEducation, getEducations, deleteEducation } from '../../../services/candidateService';
 
-const Step2Education = ({ onNext, onBack, currentStep }) => {
+const Step2Education = ({ onNext, onBack, currentStep, totalSteps = 4 }) => {
   const [educations, setEducations] = useState([]);
   const [formData, setFormData] = useState({
     degree: '',
@@ -137,7 +137,7 @@ const Step2Education = ({ onNext, onBack, currentStep }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-8">
-      <ProgressBar currentStep={currentStep} totalSteps={4} />
+      <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
 
       <div className="text-center mb-6">
         <FaGraduationCap className="w-16 h-16 text-primary mx-auto mb-4" />

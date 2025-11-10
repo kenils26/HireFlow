@@ -1,5 +1,6 @@
-const { Job, JobSkill, JobApplication, SavedJob, Candidate, Recruiter } = require('../models');
+const { Job, JobSkill, JobApplication, SavedJob, Candidate, Recruiter, Skill } = require('../models');
 const { Op } = require('sequelize');
+const { getRecommendedJobs } = require('../utils/jobRecommendation');
 
 // Get all jobs with filters and search
 const getJobs = async (req, res) => {
@@ -67,10 +68,13 @@ const getJobs = async (req, res) => {
     // Get candidate's saved jobs and applications if authenticated
     let savedJobIds = [];
     let appliedJobIds = [];
+    let candidateId = null;
 
     if (req.user && req.user.role === 'candidate') {
       const candidate = await Candidate.findOne({ where: { userId: req.user.id } });
       if (candidate) {
+        candidateId = candidate.id;
+        
         const savedJobs = await SavedJob.findAll({
           where: { candidateId: candidate.id },
           attributes: ['jobId']
@@ -85,21 +89,47 @@ const getJobs = async (req, res) => {
       }
     }
 
+    // Convert jobs to JSON format
     const jobsWithStatus = jobs.map(job => {
       const jobData = job.toJSON();
       jobData.isSaved = savedJobIds.includes(job.id);
       jobData.isApplied = appliedJobIds.includes(job.id);
+      jobData.matchScore = 0;
+      jobData.isRecommended = false;
       return jobData;
     });
+
+    // Get recommended jobs if candidate is authenticated
+    let jobsWithRecommendations = jobsWithStatus;
+    if (candidateId) {
+      jobsWithRecommendations = await getRecommendedJobs(candidateId, jobsWithStatus);
+      
+      // Separate recommended and non-recommended jobs
+      const recommendedJobs = jobsWithRecommendations.filter(job => job.isRecommended && job.matchScore > 0);
+      const otherJobs = jobsWithRecommendations.filter(job => !job.isRecommended || job.matchScore === 0);
+      
+      // Sort recommended jobs by match score (descending)
+      recommendedJobs.sort((a, b) => b.matchScore - a.matchScore);
+      
+      // Sort other jobs by creation date (descending)
+      otherJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      
+      // Combine: recommended first, then others
+      jobsWithRecommendations = [...recommendedJobs, ...otherJobs];
+    } else {
+      // For non-authenticated users or non-candidates, sort by creation date
+      jobsWithRecommendations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
 
     res.json({
       success: true,
       data: {
-        jobs: jobsWithStatus,
+        jobs: jobsWithRecommendations,
         total: count,
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: Math.ceil(count / parseInt(limit))
+        totalPages: Math.ceil(count / parseInt(limit)),
+        recommendedCount: candidateId ? jobsWithRecommendations.filter(job => job.isRecommended && job.matchScore > 0).length : 0
       }
     });
   } catch (error) {

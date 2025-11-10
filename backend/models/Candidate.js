@@ -29,9 +29,9 @@ const Candidate = sequelize.define('Candidate', {
     type: DataTypes.STRING,
     allowNull: true
   },
-  preferredLanguage: {
-    type: DataTypes.STRING,
-    defaultValue: 'English'
+  isFresher: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
   resumeUrl: {
     type: DataTypes.STRING,

@@ -3,7 +3,7 @@ import { FaUpload } from 'react-icons/fa';
 import ProgressBar from '../ProgressBar';
 import { uploadResume, completeQuestionnaire } from '../../../services/candidateService';
 
-const Step4Resume = ({ onComplete, onBack, currentStep }) => {
+const Step4Resume = ({ onComplete, onBack, currentStep, totalSteps = 4 }) => {
   const [file, setFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -76,7 +76,7 @@ const Step4Resume = ({ onComplete, onBack, currentStep }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-8">
-      <ProgressBar currentStep={currentStep} totalSteps={4} />
+      <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
 
       <div className="text-center mb-6">
         <FaUpload className="w-16 h-16 text-primary mx-auto mb-4" />

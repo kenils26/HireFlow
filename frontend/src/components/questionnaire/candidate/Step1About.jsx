@@ -3,13 +3,13 @@ import { FaUser } from 'react-icons/fa';
 import ProgressBar from '../ProgressBar';
 import { updateCandidateProfile } from '../../../services/candidateService';
 
-const Step1About = ({ userData, onNext, onBack, currentStep }) => {
+const Step1About = ({ userData, onNext, onBack, currentStep, totalSteps = 4 }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     contactNumber: '',
     location: '',
-    preferredLanguage: 'English',
+    isFresher: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,16 +21,17 @@ const Step1About = ({ userData, onNext, onBack, currentStep }) => {
         email: userData.email || '',
         contactNumber: userData.candidateProfile?.contactNumber || '',
         location: userData.candidateProfile?.location || '',
-        preferredLanguage: userData.candidateProfile?.preferredLanguage || 'English',
+        isFresher: userData.candidateProfile?.isFresher || false,
       });
     }
   }, [userData]);
 
-  const languages = ['English', 'Spanish', 'French', 'German', 'Chinese', 'Japanese', 'Hindi', 'Other'];
-
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -50,7 +51,7 @@ const Step1About = ({ userData, onNext, onBack, currentStep }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-8">
-      <ProgressBar currentStep={currentStep} totalSteps={4} />
+      <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
 
       <div className="text-center mb-6">
         <FaUser className="w-16 h-16 text-primary mx-auto mb-4" />
@@ -112,18 +113,20 @@ const Step1About = ({ userData, onNext, onBack, currentStep }) => {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Language</label>
-          <select
-            name="preferredLanguage"
-            value={formData.preferredLanguage}
-            onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            {languages.map(lang => (
-              <option key={lang} value={lang}>{lang}</option>
-            ))}
-          </select>
+        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              name="isFresher"
+              checked={formData.isFresher}
+              onChange={handleChange}
+              className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary focus:ring-2"
+            />
+            <div>
+              <span className="text-sm font-medium text-gray-700">I am a fresher (no work experience)</span>
+              <p className="text-xs text-gray-500 mt-1">Check this if you don't have any professional work experience</p>
+            </div>
+          </label>
         </div>
 
         {error && <div className="text-red-600 text-sm">{error}</div>}

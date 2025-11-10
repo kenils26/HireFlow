@@ -3,11 +3,13 @@ const path = require('path');
 const fs = require('fs');
 const pdf = require('pdf-parse');
 const axios = require('axios');
+const { Op } = require('sequelize');
+const { extractSkillsFromResume } = require('../utils/geminiSkillExtractor');
 
 // Update candidate profile (Step 1)
 const updateCandidateProfile = async (req, res) => {
   try {
-    const { fullName, contactNumber, location, preferredLanguage } = req.body;
+    const { fullName, contactNumber, location, isFresher } = req.body;
     const userId = req.user.id;
 
     const candidate = await Candidate.findOne({ where: { userId } });
@@ -22,7 +24,7 @@ const updateCandidateProfile = async (req, res) => {
       fullName,
       contactNumber,
       location,
-      preferredLanguage
+      isFresher: isFresher !== undefined ? isFresher : false
     });
 
     res.json({
@@ -380,6 +382,43 @@ const uploadResume = async (req, res) => {
 
     const resumeUrl = `/uploads/resumes/${req.file.filename}`;
     await candidate.update({ resumeUrl });
+
+    // Extract skills from resume using Gemini API (async, don't block response)
+    extractSkillsFromResume(req.file.path)
+      .then(async (skills) => {
+        if (skills && skills.length > 0) {
+          try {
+            console.log(`Extracting ${skills.length} skills from resume for candidate ${candidate.id}`);
+
+            // Add extracted skills (avoid duplicates)
+            for (const skillName of skills) {
+              const existingSkill = await Skill.findOne({
+                where: {
+                  candidateId: candidate.id,
+                  name: { [Op.iLike]: skillName }
+                }
+              });
+
+              if (!existingSkill) {
+                await Skill.create({
+                  candidateId: candidate.id,
+                  name: skillName
+                });
+              }
+            }
+
+            console.log(`Successfully saved ${skills.length} skills from resume for candidate ${candidate.id}`);
+          } catch (skillError) {
+            console.error('Error saving extracted skills:', skillError);
+          }
+        } else {
+          console.log('No skills extracted from resume');
+        }
+      })
+      .catch((error) => {
+        console.error('Error extracting skills from resume:', error);
+        // Don't fail the upload if skill extraction fails
+      });
 
     res.json({
       success: true,
