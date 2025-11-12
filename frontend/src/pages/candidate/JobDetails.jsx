@@ -14,6 +14,7 @@ import {
   FaTimes
 } from 'react-icons/fa';
 import { getJobById, applyForJob, toggleSaveJob } from '../../services/jobService';
+import { checkTestAvailability } from '../../services/candidateTestService';
 import Loading from '../../components/Loading';
 
 const JobDetails = () => {
@@ -28,10 +29,22 @@ const JobDetails = () => {
   const [coverLetterText, setCoverLetterText] = useState('');
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [error, setError] = useState('');
+  const [testInfo, setTestInfo] = useState(null);
+  const [loadingTestInfo, setLoadingTestInfo] = useState(false);
 
   useEffect(() => {
     loadJob();
   }, [id]);
+
+  useEffect(() => {
+    if (job && job.isApplied) {
+      loadTestInfo();
+    } else if (job && !job.isApplied) {
+      // Reset test info if not applied
+      setTestInfo(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.isApplied, id]);
 
   const loadJob = async () => {
     try {
@@ -44,6 +57,26 @@ const JobDetails = () => {
       console.error('Error loading job:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTestInfo = async () => {
+    try {
+      setLoadingTestInfo(true);
+      const response = await checkTestAvailability(id);
+      if (response.data && response.data.success) {
+        setTestInfo(response.data.data);
+      } else {
+        console.error('Unexpected response format:', response);
+        setTestInfo({ hasTest: false, hasApplied: true });
+      }
+    } catch (error) {
+      console.error('Error loading test info:', error);
+      console.error('Error details:', error.response?.data);
+      // Set default values on error
+      setTestInfo({ hasTest: false, hasApplied: true });
+    } finally {
+      setLoadingTestInfo(false);
     }
   };
 
@@ -122,10 +155,10 @@ const JobDetails = () => {
         setResumeFile(null);
         setCoverLetterFile(null);
         setCoverLetterText('');
-        // Navigate to applications page after successful application
-        setTimeout(() => {
-          navigate('/applications');
-        }, 1000);
+        // Reload job to get updated isApplied status
+        await loadJob();
+        // Load test info after applying
+        await loadTestInfo();
       }
     } catch (error) {
       console.error('Error applying for job:', error);
@@ -265,15 +298,35 @@ const JobDetails = () => {
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             {job.isApplied ? (
-              <button
-                disabled
-                className="px-6 py-2 bg-green-100 text-green-700 rounded-lg flex items-center space-x-2 cursor-not-allowed"
-              >
-                <FaCheckCircle className="w-5 h-5" />
-                <span>Applied</span>
-              </button>
+              <>
+                <button
+                  disabled
+                  className="px-6 py-2 bg-green-100 text-green-700 rounded-lg flex items-center space-x-2 cursor-not-allowed"
+                >
+                  <FaCheckCircle className="w-5 h-5" />
+                  <span>Applied</span>
+                </button>
+                {loadingTestInfo ? (
+                  <div className="px-6 py-2 text-gray-500">Checking test...</div>
+                ) : testInfo && testInfo.hasTest && !testInfo.hasSubmitted && (
+                  <button
+                    onClick={() => navigate(`/jobs/${id}/take-test`)}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Take Aptitude Test
+                  </button>
+                )}
+                {testInfo && testInfo.hasSubmitted && (
+                  <button
+                    onClick={() => navigate(`/jobs/${id}/test-result`)}
+                    className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    View Test Result
+                  </button>
+                )}
+              </>
             ) : (
               <button
                 onClick={() => setShowApplyModal(true)}

@@ -217,8 +217,6 @@ const ApplicationDetail = () => {
         return 'bg-yellow-100 text-yellow-800';
       case 'Under Review':
         return 'bg-blue-100 text-blue-800';
-      case 'Test Scheduled':
-        return 'bg-purple-100 text-purple-800';
       case 'Interview':
         return 'bg-green-100 text-green-800';
       case 'Offer':
@@ -236,8 +234,6 @@ const ApplicationDetail = () => {
         return 'Pending';
       case 'Under Review':
         return 'Under Review';
-      case 'Test Scheduled':
-        return 'Test Scheduled';
       case 'Interview':
         return 'Interview Scheduled';
       case 'Offer':
@@ -360,7 +356,7 @@ const ApplicationDetail = () => {
               <span>Reject</span>
             </button>
           )}
-          {['Under Review', 'Test Scheduled'].includes(application.status) && (
+          {application.status === 'Under Review' && (
             <button
               onClick={() => setShowInterviewModal(true)}
               disabled={updatingStatus}

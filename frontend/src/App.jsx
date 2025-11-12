@@ -10,16 +10,17 @@ import BrowseJobs from './pages/candidate/BrowseJobs'
 import JobDetails from './pages/candidate/JobDetails'
 import Applications from './pages/candidate/Applications'
 import ApplicationDetail from './pages/candidate/ApplicationDetail'
-import CandidateInterviews from './pages/candidate/Interviews'
+import Interviews from './pages/candidate/Interviews'
 import ResumeParser from './pages/candidate/ResumeParser'
-import CandidateProfile from './pages/candidate/Profile'
+import TakeTest from './pages/candidate/TakeTest'
+import TestResult from './pages/candidate/TestResult'
+import RecruiterInterviews from './pages/recruiter/Interviews'
 import RecruiterJobs from './pages/recruiter/Jobs'
 import RecruiterJobDetail from './pages/recruiter/JobDetail'
 import RecruiterApplications from './pages/recruiter/Applications'
 import RecruiterApplicationDetail from './pages/recruiter/ApplicationDetail'
-import RecruiterInterviews from './pages/recruiter/Interviews'
-import TestGenerator from './pages/recruiter/TestGenerator'
-import RecruiterProfile from './pages/recruiter/Profile'
+import AptitudeTests from './pages/recruiter/AptitudeTests'
+import AptitudeTestDetail from './pages/recruiter/AptitudeTestDetail'
 import ProtectedRoute from './components/ProtectedRoute'
 import Sidebar from './components/Sidebar'
 
@@ -100,7 +101,7 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['candidate']}>
               <Sidebar>
-                <CandidateInterviews />
+                <Interviews />
               </Sidebar>
             </ProtectedRoute>
           } 
@@ -116,11 +117,31 @@ function App() {
           } 
         />
         <Route 
-          path="/profile" 
+          path="/jobs/:jobId/take-test" 
           element={
             <ProtectedRoute allowedRoles={['candidate']}>
               <Sidebar>
-                <CandidateProfile />
+                <TakeTest />
+              </Sidebar>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/jobs/:jobId/test-result" 
+          element={
+            <ProtectedRoute allowedRoles={['candidate']}>
+              <Sidebar>
+                <TestResult />
+              </Sidebar>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/recruiter/interviews" 
+          element={
+            <ProtectedRoute allowedRoles={['recruiter']}>
+              <Sidebar>
+                <RecruiterInterviews />
               </Sidebar>
             </ProtectedRoute>
           } 
@@ -166,31 +187,21 @@ function App() {
           } 
         />
         <Route 
-          path="/recruiter/interviews" 
+          path="/recruiter/aptitude-tests" 
           element={
             <ProtectedRoute allowedRoles={['recruiter']}>
               <Sidebar>
-                <RecruiterInterviews />
+                <AptitudeTests />
               </Sidebar>
             </ProtectedRoute>
           } 
         />
         <Route 
-          path="/recruiter/test-generator" 
+          path="/recruiter/aptitude-tests/:id" 
           element={
             <ProtectedRoute allowedRoles={['recruiter']}>
               <Sidebar>
-                <TestGenerator />
-              </Sidebar>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/recruiter/profile" 
-          element={
-            <ProtectedRoute allowedRoles={['recruiter']}>
-              <Sidebar>
-                <RecruiterProfile />
+                <AptitudeTestDetail />
               </Sidebar>
             </ProtectedRoute>
           } 

@@ -1,4 +1,4 @@
-const { Job, JobSkill, JobApplication, Recruiter, Candidate, User } = require('../models');
+const { Job, JobSkill, JobApplication, Recruiter, Candidate, User, AptitudeTest, TestSubmission } = require('../models');
 const { Op } = require('sequelize');
 
 // Get all jobs for a recruiter
@@ -19,17 +19,20 @@ const getRecruiterJobs = async (req, res) => {
       recruiterId: recruiter.id
     };
 
-    // Filter by status (active/closed)
-    if (status && status !== 'All') {
-      where.isActive = status === 'Active';
-    }
-
-    // Search by title or company name
     if (search) {
       where[Op.or] = [
         { title: { [Op.iLike]: `%${search}%` } },
-        { companyName: { [Op.iLike]: `%${search}%` } }
+        { companyName: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } }
       ];
+    }
+
+    if (status && status !== 'All') {
+      if (status === 'Active') {
+        where.isActive = true;
+      } else if (status === 'Inactive') {
+        where.isActive = false;
+      }
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -40,32 +43,35 @@ const getRecruiterJobs = async (req, res) => {
         {
           model: JobSkill,
           as: 'skills',
-          attributes: ['id', 'skillName']
-        },
-        {
-          model: JobApplication,
-          as: 'applications',
-          attributes: ['id'],
+          attributes: ['id', 'skillName'],
           required: false
         }
       ],
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
-      offset: offset
+      offset: offset,
+      distinct: true
     });
 
     // Get application counts for each job
-    const jobsWithCounts = await Promise.all(
-      jobs.map(async (job) => {
-        const applicationCount = await JobApplication.count({
-          where: { jobId: job.id }
-        });
+    const jobIds = jobs.map(job => job.id);
+    const applicationCounts = await JobApplication.findAll({
+      where: { jobId: { [Op.in]: jobIds } },
+      attributes: ['jobId', [JobApplication.sequelize.fn('COUNT', JobApplication.sequelize.col('id')), 'count']],
+      group: ['jobId'],
+      raw: true
+    });
 
-        const jobData = job.toJSON();
-        jobData.applicationCount = applicationCount;
-        return jobData;
-      })
-    );
+    const countsMap = {};
+    applicationCounts.forEach(item => {
+      countsMap[item.jobId] = parseInt(item.count);
+    });
+
+    const jobsWithCounts = jobs.map(job => {
+      const jobData = job.toJSON();
+      jobData.applicationCount = countsMap[job.id] || 0;
+      return jobData;
+    });
 
     res.json({
       success: true,
@@ -78,7 +84,7 @@ const getRecruiterJobs = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching recruiter jobs:', error);
+    console.error('Get recruiter jobs error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching jobs',
@@ -87,7 +93,7 @@ const getRecruiterJobs = async (req, res) => {
   }
 };
 
-// Get single job by ID for recruiter
+// Get single job by ID
 const getRecruiterJob = async (req, res) => {
   try {
     const { id } = req.params;
@@ -123,7 +129,7 @@ const getRecruiterJob = async (req, res) => {
 
     // Get application count
     const applicationCount = await JobApplication.count({
-      where: { jobId: job.id }
+      where: { jobId: id }
     });
 
     const jobData = job.toJSON();
@@ -134,7 +140,7 @@ const getRecruiterJob = async (req, res) => {
       data: { job: jobData }
     });
   } catch (error) {
-    console.error('Error fetching recruiter job:', error);
+    console.error('Get recruiter job error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching job',
@@ -157,6 +163,7 @@ const createJob = async (req, res) => {
 
     const {
       title,
+      companyName,
       location,
       jobType,
       workMode,
@@ -168,8 +175,8 @@ const createJob = async (req, res) => {
       requirements,
       benefits,
       skills,
-      companyName,
-      companyLogoUrl
+      companyLogoUrl,
+      isActive
     } = req.body;
 
     // Validate required fields
@@ -185,7 +192,6 @@ const createJob = async (req, res) => {
       recruiterId: recruiter.id,
       title,
       companyName: companyName || recruiter.companyName,
-      companyLogoUrl: companyLogoUrl || recruiter.companyLogoUrl,
       location,
       jobType,
       workMode,
@@ -196,12 +202,13 @@ const createJob = async (req, res) => {
       description,
       requirements: requirements || null,
       benefits: benefits || null,
-      isActive: true
+      companyLogoUrl: companyLogoUrl || recruiter.companyLogoUrl || null,
+      isActive: isActive !== undefined ? isActive : true
     });
 
     // Add skills if provided
     if (skills && Array.isArray(skills) && skills.length > 0) {
-      const skillPromises = skills.map((skillName) =>
+      const skillPromises = skills.map(skillName =>
         JobSkill.create({
           jobId: job.id,
           skillName: skillName.trim()
@@ -227,7 +234,7 @@ const createJob = async (req, res) => {
       data: { job: jobWithSkills }
     });
   } catch (error) {
-    console.error('Error creating job:', error);
+    console.error('Create job error:', error);
     res.status(500).json({
       success: false,
       message: 'Error creating job',
@@ -265,6 +272,7 @@ const updateJob = async (req, res) => {
 
     const {
       title,
+      companyName,
       location,
       jobType,
       workMode,
@@ -276,13 +284,13 @@ const updateJob = async (req, res) => {
       requirements,
       benefits,
       skills,
-      companyName,
       companyLogoUrl,
       isActive
     } = req.body;
 
     // Update job fields
     if (title) job.title = title;
+    if (companyName) job.companyName = companyName;
     if (location) job.location = location;
     if (jobType) job.jobType = jobType;
     if (workMode) job.workMode = workMode;
@@ -293,7 +301,6 @@ const updateJob = async (req, res) => {
     if (description) job.description = description;
     if (requirements !== undefined) job.requirements = requirements;
     if (benefits !== undefined) job.benefits = benefits;
-    if (companyName) job.companyName = companyName;
     if (companyLogoUrl !== undefined) job.companyLogoUrl = companyLogoUrl;
     if (isActive !== undefined) job.isActive = isActive;
 
@@ -306,7 +313,7 @@ const updateJob = async (req, res) => {
 
       // Add new skills
       if (skills.length > 0) {
-        const skillPromises = skills.map((skillName) =>
+        const skillPromises = skills.map(skillName =>
           JobSkill.create({
             jobId: job.id,
             skillName: skillName.trim()
@@ -333,7 +340,7 @@ const updateJob = async (req, res) => {
       data: { job: updatedJob }
     });
   } catch (error) {
-    console.error('Error updating job:', error);
+    console.error('Update job error:', error);
     res.status(500).json({
       success: false,
       message: 'Error updating job',
@@ -370,9 +377,9 @@ const deleteJob = async (req, res) => {
     }
 
     // Delete associated skills
-    await JobSkill.destroy({ where: { jobId: job.id } });
+    await JobSkill.destroy({ where: { jobId: id } });
 
-    // Delete the job
+    // Delete job
     await job.destroy();
 
     res.json({
@@ -380,7 +387,7 @@ const deleteJob = async (req, res) => {
       message: 'Job deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting job:', error);
+    console.error('Delete job error:', error);
     res.status(500).json({
       success: false,
       message: 'Error deleting job',
@@ -416,31 +423,59 @@ const getJobApplications = async (req, res) => {
       });
     }
 
-    const applications = await JobApplication.findAll({
-      where: { jobId: job.id },
+    // Get all applications
+    const allApplications = await JobApplication.findAll({
+      where: { jobId: id },
       include: [
         {
           model: Candidate,
           as: 'candidate',
+          attributes: ['id', 'fullName', 'contactNumber', 'location', 'resumeUrl'],
           include: [
             {
               model: User,
               as: 'user',
               attributes: ['id', 'email']
             }
-          ],
-          attributes: ['id', 'fullName', 'contactNumber', 'location', 'resumeUrl']
+          ]
         }
       ],
       order: [['appliedAt', 'DESC']]
     });
+
+    // Check if job has test
+    const jobHasTest = await AptitudeTest.findOne({
+      where: { jobId: id }
+    });
+
+    // Filter applications based on test results
+    let applications = allApplications;
+    if (jobHasTest) {
+      // Get all test submissions for these applications
+      const applicationIds = allApplications.map(app => app.id);
+      const submissions = await TestSubmission.findAll({
+        where: { jobApplicationId: { [Op.in]: applicationIds } },
+        attributes: ['jobApplicationId', 'isPassed']
+      });
+
+      const submissionsMap = new Map();
+      submissions.forEach(sub => {
+        submissionsMap.set(sub.jobApplicationId, sub.isPassed);
+      });
+
+      // Only show applications where candidate passed the test
+      applications = allApplications.filter(app => {
+        const isPassed = submissionsMap.get(app.id);
+        return isPassed === true; // Only show if passed
+      });
+    }
 
     res.json({
       success: true,
       data: applications
     });
   } catch (error) {
-    console.error('Error fetching job applications:', error);
+    console.error('Get job applications error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching applications',
@@ -457,4 +492,3 @@ module.exports = {
   deleteJob,
   getJobApplications
 };
-

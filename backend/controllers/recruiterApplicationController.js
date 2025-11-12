@@ -1,4 +1,4 @@
-const { JobApplication, Job, Candidate, Recruiter, User, Education, Experience, Skill } = require('../models');
+const { JobApplication, Job, Candidate, Recruiter, User, Education, Experience, Skill, AptitudeTest, TestSubmission } = require('../models');
 const { Op } = require('sequelize');
 const path = require('path');
 const fs = require('fs');
@@ -52,9 +52,41 @@ const getRecruiterApplications = async (req, res) => {
       where.jobId = jobId;
     }
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    // First, identify which jobs have tests and get test submissions
+    const jobIdsWithTests = new Set();
+    const jobsWithTests = await AptitudeTest.findAll({
+      where: { jobId: { [Op.in]: jobIds } },
+      attributes: ['jobId']
+    });
+    jobsWithTests.forEach(test => jobIdsWithTests.add(test.jobId));
 
-    const { count, rows: applications } = await JobApplication.findAndCountAll({
+    // Get all test submissions for all applications of these jobs
+    let testSubmissionsMap = new Map();
+    if (jobIdsWithTests.size > 0) {
+      // Get all applications for jobs with tests to find their submissions
+      const allAppIds = await JobApplication.findAll({
+        where: { jobId: { [Op.in]: Array.from(jobIdsWithTests) } },
+        attributes: ['id']
+      });
+      const applicationIds = allAppIds.map(app => app.id);
+      
+      if (applicationIds.length > 0) {
+        const submissions = await TestSubmission.findAll({
+          where: { jobApplicationId: { [Op.in]: applicationIds } },
+          attributes: ['jobApplicationId', 'isPassed', 'score']
+        });
+        submissions.forEach(sub => {
+          testSubmissionsMap.set(sub.jobApplicationId, {
+            isPassed: sub.isPassed,
+            score: sub.score
+          });
+        });
+      }
+    }
+
+    // Get all applications (we'll filter in memory for now)
+    // For better performance with large datasets, consider using a subquery
+    const { count, rows: allApplications } = await JobApplication.findAndCountAll({
       where,
       include: [
         {
@@ -76,17 +108,37 @@ const getRecruiterApplications = async (req, res) => {
         }
       ],
       order: [['appliedAt', 'DESC']],
-      limit: parseInt(limit),
-      offset: offset,
       distinct: true
     });
 
+    // Filter applications based on test results
+    // Only show applications where:
+    // 1. Job has no test, OR
+    // 2. Job has test and candidate passed it
+    let filteredApplications = allApplications.filter(app => {
+      const jobHasTest = jobIdsWithTests.has(app.jobId);
+      
+      // If job has no test, show all applications
+      if (!jobHasTest) {
+        return true;
+      }
+
+      // If job has test, check if candidate has submitted and passed
+      const submission = testSubmissionsMap.get(app.id);
+      
+      // If no submission yet, don't show (candidate hasn't taken test)
+      if (!submission) {
+        return false;
+      }
+
+      // Only show if candidate passed the test
+      return submission.isPassed === true;
+    });
+
     // Filter by search (candidate name, job title, or email) if provided
-    let filteredApplications = applications;
-    let filteredCount = count;
     if (search) {
       const searchLower = search.toLowerCase();
-      filteredApplications = applications.filter(app => {
+      filteredApplications = filteredApplications.filter(app => {
         const candidateName = app.candidate?.fullName?.toLowerCase() || '';
         const jobTitle = app.job?.title?.toLowerCase() || '';
         const candidateEmail = app.candidate?.user?.email?.toLowerCase() || '';
@@ -94,17 +146,21 @@ const getRecruiterApplications = async (req, res) => {
                jobTitle.includes(searchLower) || 
                candidateEmail.includes(searchLower);
       });
-      filteredCount = filteredApplications.length;
     }
+
+    // Apply pagination after filtering
+    const totalFiltered = filteredApplications.length;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    filteredApplications = filteredApplications.slice(offset, offset + parseInt(limit));
 
     res.json({
       success: true,
       data: {
         applications: filteredApplications,
-        total: filteredCount,
+        total: totalFiltered,
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: Math.ceil(filteredCount / parseInt(limit))
+        totalPages: Math.ceil(totalFiltered / parseInt(limit))
       }
     });
   } catch (error) {
@@ -171,6 +227,27 @@ const getRecruiterApplication = async (req, res) => {
         }
       ]
     });
+
+    // Check if job has test and if candidate passed
+    if (application) {
+      const jobHasTest = await AptitudeTest.findOne({
+        where: { jobId: application.jobId }
+      });
+
+      if (jobHasTest) {
+        const testSubmission = await TestSubmission.findOne({
+          where: { jobApplicationId: application.id }
+        });
+
+        // If test exists but candidate hasn't taken it or failed, don't show
+        if (!testSubmission || testSubmission.isPassed !== true) {
+          return res.status(404).json({
+            success: false,
+            message: 'Application not found or candidate has not passed the required test'
+          });
+        }
+      }
+    }
 
     console.log('Application query result:', { 
       found: !!application, 

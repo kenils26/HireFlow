@@ -24,6 +24,12 @@ export const getJobApplications = (id) => {
   return api.get(`/recruiter/jobs/${id}/applications`);
 };
 
+export const generateAptitudeTest = (jobId, numberOfQuestions = 10, passingPercentage = null, timeLimit = null) => {
+  return api.post(`/recruiter/jobs/${jobId}/generate-test`, { numberOfQuestions, passingPercentage, timeLimit });
+};
+
+
+
 
 
 

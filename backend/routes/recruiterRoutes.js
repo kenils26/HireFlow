@@ -12,9 +12,16 @@ const {
   getSkills,
   deleteSkill,
   uploadCompanyDocuments,
-  completeQuestionnaire,
-  generateTestQuestions
+  completeQuestionnaire
 } = require('../controllers/recruiterController');
+const {
+  getRecruiterInterviews,
+  getRecruiterInterview,
+  createInterview,
+  updateInterview,
+  deleteInterview,
+  getJobCandidates
+} = require('../controllers/recruiterInterviewController');
 const {
   getRecruiterJobs,
   getRecruiterJob,
@@ -29,17 +36,11 @@ const {
   updateApplicationStatus
 } = require('../controllers/recruiterApplicationController');
 const {
-  getRecruiterInterviews,
-  getRecruiterInterview,
-  createInterview,
-  updateInterview,
-  deleteInterview,
-  getJobCandidates
-} = require('../controllers/recruiterInterviewController');
-const {
-  getSettings,
-  updateSettings
-} = require('../controllers/settingsController');
+  generateAptitudeTest,
+  getRecruiterAptitudeTests,
+  getAptitudeTest,
+  deleteAptitudeTest
+} = require('../controllers/aptitudeTestController');
 
 // All routes require recruiter role
 router.use(requireRecruiter);
@@ -63,6 +64,14 @@ router.post('/skill', addSkill);
 router.get('/skill', getSkills);
 router.delete('/skill/:id', deleteSkill);
 
+// Interview routes
+router.get('/interviews', getRecruiterInterviews);
+router.get('/interviews/:id', getRecruiterInterview);
+router.post('/interviews', createInterview);
+router.put('/interviews/:id', updateInterview);
+router.delete('/interviews/:id', deleteInterview);
+router.get('/jobs/:jobId/candidates', getJobCandidates);
+
 // Job routes
 router.get('/jobs', getRecruiterJobs);
 router.get('/jobs/:id', getRecruiterJob);
@@ -76,20 +85,11 @@ router.get('/applications', getRecruiterApplications);
 router.get('/applications/:id', getRecruiterApplication);
 router.put('/applications/:id/status', updateApplicationStatus);
 
-// Interview routes
-router.get('/interviews', getRecruiterInterviews);
-router.get('/interviews/:id', getRecruiterInterview);
-router.post('/interviews', createInterview);
-router.put('/interviews/:id', updateInterview);
-router.delete('/interviews/:id', deleteInterview);
-router.get('/jobs/:jobId/candidates', getJobCandidates);
-
-// Test generator routes
-router.post('/generate-test', generateTestQuestions);
-
-// Settings routes
-router.get('/settings', getSettings);
-router.put('/settings', updateSettings);
+// Aptitude Test routes
+router.post('/jobs/:jobId/generate-test', generateAptitudeTest);
+router.get('/tests', getRecruiterAptitudeTests);
+router.get('/tests/:id', getAptitudeTest);
+router.delete('/tests/:id', deleteAptitudeTest);
 
 module.exports = router;
 

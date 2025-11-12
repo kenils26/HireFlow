@@ -70,8 +70,6 @@ const startServer = async () => {
     // Sync database (create tables if they don't exist)
     await syncDatabase(false);
     
-    // Start job auto-close scheduler
-    
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });

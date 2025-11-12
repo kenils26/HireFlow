@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes } from 'react-icons/fa';
-import { createJob, updateJob, getRecruiterJob } from '../../services/recruiterJobService';
+import { FaTimes, FaSpinner } from 'react-icons/fa';
+import { createJob, updateJob, getRecruiterJob, generateAptitudeTest } from '../../services/recruiterJobService';
 
 const JobModal = ({ job, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     title: '',
+    companyName: '',
     location: '',
     jobType: 'Full-time',
     workMode: 'On-site',
@@ -16,53 +17,86 @@ const JobModal = ({ job, onClose, onSave }) => {
     requirements: '',
     benefits: '',
     skills: [],
-    companyName: '',
     companyLogoUrl: '',
     isActive: true
   });
   const [skillInput, setSkillInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [error, setError] = useState('');
+  const [generateTest, setGenerateTest] = useState(false);
+  const [numberOfQuestions, setNumberOfQuestions] = useState(10);
+  const [passingPercentage, setPassingPercentage] = useState(70);
+  const [timeLimit, setTimeLimit] = useState(30); // Default 30 minutes
+  const [generatingTest, setGeneratingTest] = useState(false);
 
   useEffect(() => {
     if (job) {
-      setFormData({
-        title: job.title || '',
-        location: job.location || '',
-        jobType: job.jobType || 'Full-time',
-        workMode: job.workMode || 'On-site',
-        experienceLevel: job.experienceLevel || '',
-        salaryMin: job.salaryMin || '',
-        salaryMax: job.salaryMax || '',
-        salaryCurrency: job.salaryCurrency || 'USD',
-        description: job.description || '',
-        requirements: job.requirements || '',
-        benefits: job.benefits || '',
-        skills: job.skills ? job.skills.map(s => s.skillName) : [],
-        companyName: job.companyName || '',
-        companyLogoUrl: job.companyLogoUrl || '',
-        isActive: job.isActive !== undefined ? job.isActive : true
-      });
+      // Load full job details if editing
+      if (job.id && !job.skills) {
+        loadJobDetails(job.id);
+      } else {
+        setFormData({
+          title: job.title || '',
+          companyName: job.companyName || '',
+          location: job.location || '',
+          jobType: job.jobType || 'Full-time',
+          workMode: job.workMode || 'On-site',
+          experienceLevel: job.experienceLevel || '',
+          salaryMin: job.salaryMin || '',
+          salaryMax: job.salaryMax || '',
+          salaryCurrency: job.salaryCurrency || 'USD',
+          description: job.description || '',
+          requirements: job.requirements || '',
+          benefits: job.benefits || '',
+          skills: job.skills ? job.skills.map(s => s.skillName || s) : [],
+          companyLogoUrl: job.companyLogoUrl || '',
+          isActive: job.isActive !== undefined ? job.isActive : true
+        });
+      }
     }
   }, [job]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Clear error for this field
-    if (errors[name]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
+  const loadJobDetails = async (jobId) => {
+    try {
+      const response = await getRecruiterJob(jobId);
+      if (response.data && response.data.success) {
+        const jobData = response.data.data.job;
+        setFormData({
+          title: jobData.title || '',
+          companyName: jobData.companyName || '',
+          location: jobData.location || '',
+          jobType: jobData.jobType || 'Full-time',
+          workMode: jobData.workMode || 'On-site',
+          experienceLevel: jobData.experienceLevel || '',
+          salaryMin: jobData.salaryMin || '',
+          salaryMax: jobData.salaryMax || '',
+          salaryCurrency: jobData.salaryCurrency || 'USD',
+          description: jobData.description || '',
+          requirements: jobData.requirements || '',
+          benefits: jobData.benefits || '',
+          skills: jobData.skills ? jobData.skills.map(s => s.skillName || s) : [],
+          companyLogoUrl: jobData.companyLogoUrl || '',
+          isActive: jobData.isActive !== undefined ? jobData.isActive : true
+        });
+      }
+    } catch (error) {
+      console.error('Error loading job details:', error);
+      setError('Error loading job details');
     }
   };
 
-  const handleAddSkill = () => {
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleAddSkill = (e) => {
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
     if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {
       setFormData(prev => ({
         ...prev,
@@ -80,13 +114,11 @@ const JobModal = ({ job, onClose, onSave }) => {
   };
 
   const validateForm = () => {
-    const newErrors = {};
-    if (!formData.title.trim()) newErrors.title = 'Job title is required';
-    if (!formData.location.trim()) newErrors.location = 'Location is required';
-    if (!formData.experienceLevel.trim()) newErrors.experienceLevel = 'Experience level is required';
-    if (!formData.description.trim()) newErrors.description = 'Description is required';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!formData.title || !formData.location || !formData.jobType || !formData.workMode || !formData.experienceLevel || !formData.description) {
+      setError('Please fill in all required fields');
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
@@ -97,6 +129,8 @@ const JobModal = ({ job, onClose, onSave }) => {
 
     try {
       setLoading(true);
+      setError('');
+
       const data = {
         ...formData,
         salaryMin: formData.salaryMin ? parseFloat(formData.salaryMin) : null,
@@ -104,15 +138,49 @@ const JobModal = ({ job, onClose, onSave }) => {
         isActive: formData.isActive !== undefined ? formData.isActive : true
       };
 
-      if (job) {
-        await updateJob(job.id, data);
+      let savedJob;
+      if (job && job.id) {
+        const response = await updateJob(job.id, data);
+        savedJob = response.data?.data?.job || job;
       } else {
-        await createJob(data);
+        const response = await createJob(data);
+        savedJob = response.data?.data?.job;
       }
+
+      // Generate aptitude test if requested (only for new jobs)
+      if (generateTest && savedJob && savedJob.id && !job) {
+        try {
+          setGeneratingTest(true);
+          setError(''); // Clear any previous errors
+          await generateAptitudeTest(savedJob.id, numberOfQuestions, passingPercentage, timeLimit);
+        } catch (testError) {
+          console.error('Error generating aptitude test:', testError);
+          const errorMessage = testError.response?.data?.message || testError.message || 'Failed to generate aptitude test';
+          const statusCode = testError.response?.status;
+          
+          // Check if it's an API overload error (503 or API_OVERLOAD)
+          if (
+            statusCode === 503 || 
+            testError.response?.data?.error === 'API_OVERLOAD' || 
+            errorMessage.toLowerCase().includes('high load') || 
+            errorMessage.toLowerCase().includes('wait') ||
+            errorMessage.toLowerCase().includes('overloaded') ||
+            errorMessage.toLowerCase().includes('rate limit') ||
+            errorMessage.toLowerCase().includes('service unavailable')
+          ) {
+            setError('⚠️ The AI service is currently experiencing high load. Please wait a few moments (1-2 minutes) and try generating the test again from the job details page. The job has been saved successfully.');
+          } else {
+            setError('Job saved successfully, but failed to generate aptitude test: ' + errorMessage + '. You can try generating it again later from the job details page.');
+          }
+        } finally {
+          setGeneratingTest(false);
+        }
+      }
+
       onSave();
     } catch (error) {
       console.error('Error saving job:', error);
-      alert(error.response?.data?.message || 'Error saving job');
+      setError(error.response?.data?.message || 'Error saving job');
     } finally {
       setLoading(false);
     }
@@ -134,253 +202,275 @@ const JobModal = ({ job, onClose, onSave }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {error}
+            </div>
+          )}
+
           {/* Basic Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Job Title *
-              </label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                  errors.title ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="e.g., Software Engineer"
-              />
-              {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
-            </div>
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Basic Information</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Job Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Location *
-              </label>
-              <input
-                type="text"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                  errors.location ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="e.g., San Francisco, CA"
-              />
-              {errors.location && <p className="text-red-500 text-xs mt-1">{errors.location}</p>}
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Company Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="companyName"
+                  value={formData.companyName}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Job Type *
-              </label>
-              <select
-                name="jobType"
-                value={formData.jobType}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="Full-time">Full-time</option>
-                <option value="Part-time">Part-time</option>
-                <option value="Contract">Contract</option>
-                <option value="Internship">Internship</option>
-                <option value="Freelance">Freelance</option>
-              </select>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Location <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Work Mode *
-              </label>
-              <select
-                name="workMode"
-                value={formData.workMode}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="Remote">Remote</option>
-                <option value="Hybrid">Hybrid</option>
-                <option value="On-site">On-site</option>
-              </select>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Experience Level <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="experienceLevel"
+                  value={formData.experienceLevel}
+                  onChange={handleChange}
+                  placeholder="e.g., Entry Level, Mid Level, Senior"
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Experience Level *
-              </label>
-              <input
-                type="text"
-                name="experienceLevel"
-                value={formData.experienceLevel}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                  errors.experienceLevel ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="e.g., 2-5 years"
-              />
-              {errors.experienceLevel && <p className="text-red-500 text-xs mt-1">{errors.experienceLevel}</p>}
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Job Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="jobType"
+                  value={formData.jobType}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="Full-time">Full-time</option>
+                  <option value="Part-time">Part-time</option>
+                  <option value="Contract">Contract</option>
+                  <option value="Internship">Internship</option>
+                  <option value="Freelance">Freelance</option>
+                </select>
+              </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Work Mode <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="workMode"
+                  value={formData.workMode}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="Remote">Remote</option>
+                  <option value="Hybrid">Hybrid</option>
+                  <option value="On-site">On-site</option>
+                </select>
+              </div>
+            </div>
           </div>
 
-          {/* Salary Information */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Minimum Salary
-              </label>
-              <input
-                type="number"
-                name="salaryMin"
-                value={formData.salaryMin}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="e.g., 50000"
-              />
-            </div>
+          {/* Salary */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Salary</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Minimum Salary
+                </label>
+                <input
+                  type="number"
+                  name="salaryMin"
+                  value={formData.salaryMin}
+                  onChange={handleChange}
+                  min="0"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Maximum Salary
-              </label>
-              <input
-                type="number"
-                name="salaryMax"
-                value={formData.salaryMax}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="e.g., 100000"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Maximum Salary
+                </label>
+                <input
+                  type="number"
+                  name="salaryMax"
+                  value={formData.salaryMax}
+                  onChange={handleChange}
+                  min="0"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Currency
-              </label>
-              <select
-                name="salaryCurrency"
-                value={formData.salaryCurrency}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="INR">INR</option>
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Currency
+                </label>
+                <select
+                  name="salaryCurrency"
+                  value={formData.salaryCurrency}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="INR">INR</option>
+                </select>
+              </div>
             </div>
           </div>
 
           {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Job Description *
-            </label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              rows={5}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                errors.description ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="Describe the job role, responsibilities, and what you're looking for..."
-            />
-            {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Description</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Job Description <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows={6}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
           </div>
 
           {/* Requirements */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Requirements
-            </label>
-            <textarea
-              name="requirements"
-              value={formData.requirements}
-              onChange={handleChange}
-              rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="List the required qualifications, skills, and experience..."
-            />
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Requirements</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Requirements
+              </label>
+              <textarea
+                name="requirements"
+                value={formData.requirements}
+                onChange={handleChange}
+                rows={4}
+                placeholder="List the requirements for this job..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
           </div>
 
           {/* Benefits */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Benefits
-            </label>
-            <textarea
-              name="benefits"
-              value={formData.benefits}
-              onChange={handleChange}
-              rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="List the benefits and perks offered..."
-            />
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Benefits</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Benefits
+              </label>
+              <textarea
+                name="benefits"
+                value={formData.benefits}
+                onChange={handleChange}
+                rows={4}
+                placeholder="List the benefits for this job..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
           </div>
 
           {/* Skills */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Required Skills
-            </label>
-            <div className="flex space-x-2 mb-2">
-              <input
-                type="text"
-                value={skillInput}
-                onChange={(e) => setSkillInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddSkill();
-                  }
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Add a skill and press Enter"
-              />
-              <button
-                type="button"
-                onClick={handleAddSkill}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Add
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {formData.skills.map((skill, index) => (
-                <span
-                  key={index}
-                  className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm flex items-center space-x-2"
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Required Skills</h3>
+            
+            <div className="mb-4">
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddSkill(e);
+                    }
+                  }}
+                  placeholder="Add a skill and press Enter"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddSkill}
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
                 >
-                  <span>{skill}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveSkill(skill)}
-                    className="text-blue-700 hover:text-blue-900"
-                  >
-                    <FaTimes className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
+                  Add
+                </button>
+              </div>
             </div>
+
+            {formData.skills.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {formData.skills.map((skill, index) => (
+                  <span
+                    key={index}
+                    className="px-3 py-1 bg-primary bg-opacity-10 text-primary rounded-full text-sm flex items-center space-x-2"
+                  >
+                    <span>{skill}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSkill(skill)}
+                      className="text-primary hover:text-primary-dark"
+                    >
+                      <FaTimes className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Company Information (Optional) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Company Name
-              </label>
-              <input
-                type="text"
-                name="companyName"
-                value={formData.companyName}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Leave empty to use your profile company name"
-              />
-            </div>
-
+          {/* Company Logo URL */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Company Information</h3>
+            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Company Logo URL
@@ -390,15 +480,92 @@ const JobModal = ({ job, onClose, onSave }) => {
                 name="companyLogoUrl"
                 value={formData.companyLogoUrl}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="https://example.com/logo.png"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
 
+          {/* Generate Aptitude Test (only for new jobs) */}
+          {!job && (
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Aptitude Test</h3>
+              <label className="flex items-center space-x-2 mb-4">
+                <input
+                  type="checkbox"
+                  checked={generateTest}
+                  onChange={(e) => setGenerateTest(e.target.checked)}
+                  className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Generate aptitude test using Gemini API
+                </span>
+              </label>
+              {generateTest && (
+                <div className="ml-6 mb-4 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Number of Questions
+                    </label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="50"
+                      value={numberOfQuestions}
+                      onChange={(e) => setNumberOfQuestions(parseInt(e.target.value) || 10)}
+                      className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Passing Percentage <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={passingPercentage}
+                        onChange={(e) => setPassingPercentage(parseFloat(e.target.value) || 0)}
+                        className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <span className="text-gray-600">%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Candidates scoring above this percentage will be shortlisted.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Time Limit (Minutes)
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        min="5"
+                        max="300"
+                        value={timeLimit}
+                        onChange={(e) => setTimeLimit(parseInt(e.target.value) || 30)}
+                        className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <span className="text-gray-600">minutes</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Maximum time candidates will have to complete the test. Test will auto-submit when time expires.
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Generate an aptitude test with questions related to this job position.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Job Status (for editing) */}
           {job && (
-            <div>
+            <div className="border-t border-gray-200 pt-6">
               <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -427,10 +594,13 @@ const JobModal = ({ job, onClose, onSave }) => {
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+              disabled={loading || generatingTest}
+              className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center space-x-2"
             >
-              {loading ? 'Saving...' : job ? 'Update Job' : 'Post Job'}
+              {(loading || generatingTest) && <FaSpinner className="animate-spin" />}
+              <span>
+                {generatingTest ? 'Generating Test...' : loading ? 'Saving...' : job ? 'Update Job' : 'Post Job'}
+              </span>
             </button>
           </div>
         </form>
@@ -440,4 +610,3 @@ const JobModal = ({ job, onClose, onSave }) => {
 };
 
 export default JobModal;
-

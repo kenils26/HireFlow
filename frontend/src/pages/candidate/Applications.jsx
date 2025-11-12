@@ -38,8 +38,6 @@ const Applications = () => {
         return 'bg-green-100 text-green-800';
       case 'Under Review':
         return 'bg-blue-100 text-blue-800';
-      case 'Test Scheduled':
-        return 'bg-yellow-100 text-yellow-800';
       case 'Offer':
         return 'bg-purple-100 text-purple-800';
       case 'Rejected':
@@ -53,8 +51,6 @@ const Applications = () => {
     switch (status) {
       case 'Interview':
         return 'Interview Scheduled';
-      case 'Test Scheduled':
-        return 'Test Scheduled';
       case 'Offer':
         return 'Offer Received';
       default:
@@ -68,8 +64,6 @@ const Applications = () => {
         return 'Waiting for response';
       case 'Under Review':
         return 'Waiting for response';
-      case 'Test Scheduled':
-        return 'Coding Test';
       case 'Interview':
         return 'Technical Interview';
       case 'Offer':

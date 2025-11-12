@@ -23,9 +23,16 @@ const {
   getApplicationStatus
 } = require('../controllers/applicationController');
 const {
-  getSettings,
-  updateSettings
-} = require('../controllers/settingsController');
+  getCandidateInterviews,
+  getCandidateInterview,
+  requestReschedule
+} = require('../controllers/candidateInterviewController');
+const {
+  getTestForJob,
+  submitTest,
+  getTestResult,
+  checkTestAvailability
+} = require('../controllers/candidateTestController');
 
 // All routes require candidate role
 router.use(requireCandidate);
@@ -33,7 +40,6 @@ router.use(requireCandidate);
 // Profile routes
 router.put('/profile', updateCandidateProfile);
 router.post('/resume', upload.single('resume'), uploadResume);
-router.post('/parse-resume', upload.single('resume'), parseResume);
 router.post('/complete-questionnaire', completeQuestionnaire);
 
 // Education routes
@@ -57,19 +63,18 @@ router.get('/applications/:id', getApplication);
 router.get('/applications/:id/status', getApplicationStatus);
 
 // Interview routes
-const {
-  getCandidateInterviews,
-  getCandidateInterview,
-  requestReschedule
-} = require('../controllers/candidateInterviewController');
-
 router.get('/interviews', getCandidateInterviews);
 router.get('/interviews/:id', getCandidateInterview);
 router.post('/interviews/:id/reschedule', requestReschedule);
 
-// Settings routes
-router.get('/settings', getSettings);
-router.put('/settings', updateSettings);
+// Resume parser route
+router.post('/parse-resume', upload.single('resume'), parseResume);
+
+// Test routes
+router.get('/jobs/:jobId/test/check', checkTestAvailability);
+router.get('/jobs/:jobId/test', getTestForJob);
+router.post('/jobs/:jobId/test/submit', submitTest);
+router.get('/jobs/:jobId/test/result', getTestResult);
 
 module.exports = router;
 

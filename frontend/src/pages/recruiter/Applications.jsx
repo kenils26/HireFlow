@@ -14,12 +14,12 @@ import Loading from '../../components/Loading';
 
 const Applications = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [applications, setApplications] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'All');
   const [jobFilter, setJobFilter] = useState(searchParams.get('jobId') || 'All');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -65,8 +65,29 @@ const Applications = () => {
     }
   };
 
-  const handleViewApplication = (applicationId) => {
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setCurrentPage(1);
+    loadApplications();
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setStatusFilter('All');
+    setJobFilter('All');
+    setCurrentPage(1);
+    setSearchParams({});
+    loadApplications();
+  };
+
+  const handleApplicationClick = (applicationId) => {
     navigate(`/recruiter/applications/${applicationId}`);
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const getStatusColor = (status) => {
@@ -75,8 +96,6 @@ const Applications = () => {
         return 'bg-yellow-100 text-yellow-800';
       case 'Under Review':
         return 'bg-blue-100 text-blue-800';
-      case 'Test Scheduled':
-        return 'bg-purple-100 text-purple-800';
       case 'Interview':
         return 'bg-green-100 text-green-800';
       case 'Offer':
@@ -94,8 +113,6 @@ const Applications = () => {
         return 'Pending';
       case 'Under Review':
         return 'Under Review';
-      case 'Test Scheduled':
-        return 'Test Scheduled';
       case 'Interview':
         return 'Interview Scheduled';
       case 'Offer':
@@ -105,22 +122,6 @@ const Applications = () => {
       default:
         return status;
     }
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setCurrentPage(1);
-    loadApplications();
-  };
-
-  const clearSearch = () => {
-    setSearchQuery('');
-    setCurrentPage(1);
   };
 
   if (loading && applications.length === 0) {
@@ -146,17 +147,8 @@ const Applications = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by candidate name, job title, or email..."
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={clearSearch}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <FaTimesIcon className="w-4 h-4" />
-                </button>
-              )}
             </div>
             <select
               value={statusFilter}
@@ -169,9 +161,8 @@ const Applications = () => {
               <option value="All">All Status</option>
               <option value="Applied">Pending</option>
               <option value="Under Review">Under Review</option>
-              <option value="Test Scheduled">Test Scheduled</option>
               <option value="Interview">Interview Scheduled</option>
-              <option value="Offer">Accepted</option>
+              <option value="Offer">Offer</option>
               <option value="Rejected">Rejected</option>
             </select>
             <select
@@ -195,6 +186,16 @@ const Applications = () => {
             >
               Search
             </button>
+            {(searchQuery || statusFilter !== 'All' || jobFilter !== 'All') && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
+              >
+                <FaTimesIcon className="w-4 h-4" />
+                <span>Clear</span>
+              </button>
+            )}
           </div>
         </form>
       </div>
@@ -205,7 +206,7 @@ const Applications = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       ) : applications.length === 0 ? (
-        <div className="bg-white rounded-xl shadow p-12 text-center">
+        <div className="bg-white rounded-lg shadow p-12 text-center">
           <p className="text-gray-600 text-lg">No applications found</p>
         </div>
       ) : (
@@ -214,13 +215,14 @@ const Applications = () => {
             {applications.map((application) => (
               <div
                 key={application.id}
-                onClick={() => handleViewApplication(application.id)}
-                className="bg-white rounded-xl shadow p-6 hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => handleApplicationClick(application.id)}
+                className="bg-white rounded-lg shadow p-5 cursor-pointer hover:shadow-md transition-shadow"
               >
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-lg font-bold text-gray-800">
+                    {/* Candidate Name and Status */}
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-semibold text-gray-800">
                         {application.candidate?.fullName || 'Unknown Candidate'}
                       </h3>
                       <span
@@ -231,31 +233,32 @@ const Applications = () => {
                         {getStatusLabel(application.status)}
                       </span>
                     </div>
-                    <p className="text-gray-600 mb-3">
-                      Applied for: <span className="font-medium">{application.job?.title}</span>
+
+                    {/* Job Title */}
+                    <p className="text-gray-600 text-sm mb-4 flex items-center">
+                      <FaBriefcase className="w-4 h-4 mr-2 text-gray-400" />
+                      {application.job?.title || 'Unknown Job'}
                     </p>
-                    <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                      <div className="flex items-center">
-                        <FaCalendarAlt className="w-4 h-4 mr-2 text-gray-400" />
-                        Applied on {formatDate(application.appliedAt)}
+
+                    {/* Application Date */}
+                    <div className="flex items-center space-x-6 text-sm text-gray-600">
+                      <div className="flex items-center space-x-2">
+                        <FaCalendarAlt className="w-4 h-4" />
+                        <span>Applied {formatDate(application.appliedAt)}</span>
                       </div>
-                      <div className="flex items-center">
-                        <FaUser className="w-4 h-4 mr-2 text-gray-400" />
-                        {application.candidate?.user?.email || 'N/A'}
-                      </div>
-                      {application.candidate?.location && (
-                        <div className="flex items-center">
-                          <FaBriefcase className="w-4 h-4 mr-2 text-gray-400" />
-                          {application.candidate.location}
+                      {application.candidate?.user?.email && (
+                        <div className="flex items-center space-x-2">
+                          <FaUser className="w-4 h-4" />
+                          <span>{application.candidate.user.email}</span>
                         </div>
                       )}
                     </div>
                   </div>
-                </div>
 
-                {/* Arrow Icon */}
-                <div className="flex justify-end mt-4">
-                  <FaChevronRight className="w-5 h-5 text-gray-400" />
+                  {/* Arrow Icon */}
+                  <div className="ml-4">
+                    <FaChevronRight className="w-5 h-5 text-gray-400" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -263,19 +266,19 @@ const Applications = () => {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="mt-6 flex justify-center items-center space-x-2">
+            <div className="mt-6 flex items-center justify-center space-x-2">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
                 className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
               >
                 Previous
               </button>
-              <span className="px-4 py-2 text-gray-700">
+              <span className="px-4 py-2 text-gray-600">
                 Page {currentPage} of {totalPages}
               </span>
               <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
                 className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
               >
@@ -290,4 +293,3 @@ const Applications = () => {
 };
 
 export default Applications;
-

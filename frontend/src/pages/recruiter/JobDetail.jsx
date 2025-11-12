@@ -10,9 +10,12 @@ import {
   FaUser,
   FaDollarSign,
   FaUsers,
-  FaBuilding
+  FaBuilding,
+  FaTimes,
+  FaSpinner
 } from 'react-icons/fa';
 import { getRecruiterJob, deleteJob } from '../../services/recruiterJobService';
+import { generateAptitudeTest, getRecruiterAptitudeTests } from '../../services/aptitudeTestService';
 import JobModal from '../../components/recruiter/JobModal';
 import Loading from '../../components/Loading';
 
@@ -23,10 +26,26 @@ const JobDetail = () => {
   const [loading, setLoading] = useState(true);
   const [showJobModal, setShowJobModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [generatingTest, setGeneratingTest] = useState(false);
+  const [testError, setTestError] = useState('');
+  const [hasTest, setHasTest] = useState(false);
+  const [checkingTest, setCheckingTest] = useState(false);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [testParams, setTestParams] = useState({
+    numberOfQuestions: 10,
+    passingPercentage: 70,
+    timeLimit: 30
+  });
 
   useEffect(() => {
     loadJob();
   }, [id]);
+
+  useEffect(() => {
+    if (job) {
+      checkExistingTest();
+    }
+  }, [job, id]);
 
   const loadJob = async () => {
     try {
@@ -72,6 +91,76 @@ const JobDetail = () => {
   const handleJobSaved = () => {
     setShowJobModal(false);
     loadJob();
+  };
+
+  const checkExistingTest = async () => {
+    try {
+      setCheckingTest(true);
+      const response = await getRecruiterAptitudeTests();
+      if (response.data && response.data.success) {
+        const tests = response.data.data.tests || [];
+        const testForThisJob = tests.find(t => t.jobId === id);
+        setHasTest(!!testForThisJob);
+      }
+    } catch (error) {
+      console.error('Error checking existing test:', error);
+    } finally {
+      setCheckingTest(false);
+    }
+  };
+
+  const handleOpenTestModal = () => {
+    setTestError('');
+    setShowTestModal(true);
+  };
+
+  const handleCloseTestModal = () => {
+    setShowTestModal(false);
+    setTestError('');
+  };
+
+  const handleTestParamChange = (field, value) => {
+    setTestParams(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleGenerateTest = async () => {
+    try {
+      setGeneratingTest(true);
+      setTestError('');
+      await generateAptitudeTest(
+        id, 
+        testParams.numberOfQuestions, 
+        testParams.passingPercentage, 
+        testParams.timeLimit
+      );
+      setHasTest(true);
+      setShowTestModal(false);
+      alert('Aptitude test generated successfully! You can view it in the Aptitude Tests section.');
+    } catch (error) {
+      console.error('Error generating test:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to generate test';
+      const statusCode = error.response?.status;
+      
+      // Check if it's an API overload error (503 or API_OVERLOAD)
+      if (
+        statusCode === 503 || 
+        error.response?.data?.error === 'API_OVERLOAD' || 
+        errorMessage.toLowerCase().includes('high load') || 
+        errorMessage.toLowerCase().includes('wait') ||
+        errorMessage.toLowerCase().includes('overloaded') ||
+        errorMessage.toLowerCase().includes('rate limit') ||
+        errorMessage.toLowerCase().includes('service unavailable')
+      ) {
+        setTestError('⚠️ The AI service is currently experiencing high load. Please wait a few moments (1-2 minutes) and try again.');
+      } else {
+        setTestError('Failed to generate test: ' + errorMessage + '. Please try again later.');
+      }
+    } finally {
+      setGeneratingTest(false);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -209,7 +298,7 @@ const JobDetail = () => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-3 pt-4 border-t border-gray-200">
+        <div className="flex gap-3 pt-4 border-t border-gray-200 flex-wrap">
           <button
             onClick={handleViewApplications}
             className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center space-x-2"
@@ -217,6 +306,34 @@ const JobDetail = () => {
             <FaEye className="w-5 h-5" />
             <span>View Applications ({job.applicationCount || 0})</span>
           </button>
+          {!hasTest && !checkingTest && (
+            <button
+              onClick={handleOpenTestModal}
+              disabled={generatingTest}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            >
+              {generatingTest ? (
+                <>
+                  <FaSpinner className="animate-spin" />
+                  <span>Generating Test...</span>
+                </>
+              ) : (
+                <>
+                  <span>📝</span>
+                  <span>Generate Aptitude Test</span>
+                </>
+              )}
+            </button>
+          )}
+          {hasTest && (
+            <button
+              onClick={() => navigate('/recruiter/aptitude-tests')}
+              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+            >
+              <FaEye className="w-5 h-5" />
+              <span>View Test</span>
+            </button>
+          )}
           <button
             onClick={handleEdit}
             className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
@@ -233,6 +350,23 @@ const JobDetail = () => {
             <span>{deleting ? 'Deleting...' : 'Delete'}</span>
           </button>
         </div>
+        
+        {/* Test Error Message */}
+        {testError && (
+          <div className={`mt-4 p-4 rounded-lg border ${
+            testError.includes('high load') || testError.includes('overloaded') || testError.includes('wait')
+              ? 'bg-orange-50 border-orange-200'
+              : 'bg-red-50 border-red-200'
+          }`}>
+            <p className={`text-sm ${
+              testError.includes('high load') || testError.includes('overloaded') || testError.includes('wait')
+                ? 'text-orange-800'
+                : 'text-red-800'
+            }`}>
+              {testError}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Job Description */}
@@ -270,6 +404,119 @@ const JobDetail = () => {
           onClose={() => setShowJobModal(false)}
           onSave={handleJobSaved}
         />
+      )}
+
+      {/* Test Generation Modal */}
+      {showTestModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-800">Generate Aptitude Test</h2>
+              <button
+                onClick={handleCloseTestModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                disabled={generatingTest}
+              >
+                <FaTimes className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {testError && (
+                <div className={`p-3 rounded-lg border ${
+                  testError.includes('high load') || testError.includes('overloaded') || testError.includes('wait')
+                    ? 'bg-orange-50 border-orange-200 text-orange-800'
+                    : 'bg-red-50 border-red-200 text-red-800'
+                }`}>
+                  <p className="text-sm">{testError}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Questions
+                </label>
+                <input
+                  type="number"
+                  min="5"
+                  max="50"
+                  value={testParams.numberOfQuestions}
+                  onChange={(e) => handleTestParamChange('numberOfQuestions', parseInt(e.target.value) || 10)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  disabled={generatingTest}
+                />
+                <p className="text-xs text-gray-500 mt-1">Minimum 5, Maximum 50 questions</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Passing Percentage <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={testParams.passingPercentage}
+                    onChange={(e) => handleTestParamChange('passingPercentage', parseFloat(e.target.value) || 0)}
+                    className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={generatingTest}
+                  />
+                  <span className="text-gray-600">%</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Candidates scoring above this percentage will be shortlisted.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time Limit (Minutes) <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    min="5"
+                    max="300"
+                    value={testParams.timeLimit}
+                    onChange={(e) => handleTestParamChange('timeLimit', parseInt(e.target.value) || 30)}
+                    className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={generatingTest}
+                  />
+                  <span className="text-gray-600">minutes</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Maximum time candidates will have to complete the test. Test will auto-submit when time expires.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={handleCloseTestModal}
+                  disabled={generatingTest}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGenerateTest}
+                  disabled={generatingTest || !testParams.passingPercentage || !testParams.timeLimit}
+                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {generatingTest ? (
+                    <>
+                      <FaSpinner className="animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <span>Generate Test</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

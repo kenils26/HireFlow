@@ -54,10 +54,6 @@ export const completeQuestionnaire = () => {
   return api.post('/recruiter/complete-questionnaire');
 };
 
-export const generateTestQuestions = (data) => {
-  return api.post('/recruiter/generate-test', data);
-};
-
 export const getSettings = () => {
   return api.get('/recruiter/settings');
 };

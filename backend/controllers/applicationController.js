@@ -1,4 +1,4 @@
-const { JobApplication, Job, Candidate, Recruiter, JobSkill } = require('../models');
+const { JobApplication, Job, Candidate, Recruiter } = require('../models');
 const { Op } = require('sequelize');
 
 // Get all applications for a candidate
@@ -122,15 +122,7 @@ const getApplicationStatus = async (req, res) => {
         {
           model: Job,
           as: 'job',
-          attributes: ['id', 'title', 'companyName', 'companyLogoUrl', 'location', 'jobType', 'workMode', 'experienceLevel', 'salaryMin', 'salaryMax', 'salaryCurrency', 'description', 'createdAt'],
-          include: [
-            {
-              model: JobSkill,
-              as: 'skills',
-              attributes: ['id', 'skillName'],
-              required: false
-            }
-          ]
+          attributes: ['id', 'title', 'companyName', 'companyLogoUrl']
         }
       ]
     });
@@ -145,7 +137,7 @@ const getApplicationStatus = async (req, res) => {
     // Define status timeline
     const statusTimeline = [
       { status: 'Applied', label: 'Applied', date: application.appliedAt, completed: true },
-      { status: 'Under Review', label: 'Under Review', date: null, completed: !['Applied'].includes(application.status) },
+      { status: 'Under Review', label: 'Under Review', date: null, completed: application.status !== 'Applied' },
       { status: 'Interview', label: 'Interview Scheduled', date: null, completed: ['Interview', 'Offer'].includes(application.status) },
       { status: 'Offer', label: 'Offer Received', date: null, completed: application.status === 'Offer' },
       { status: 'Rejected', label: 'Rejected', date: null, completed: application.status === 'Rejected' }
@@ -155,13 +147,11 @@ const getApplicationStatus = async (req, res) => {
     const currentStatusIndex = statusTimeline.findIndex(s => s.status === application.status);
     
     // Mark all statuses up to current as completed
-    if (currentStatusIndex >= 0) {
-      statusTimeline.forEach((status, index) => {
-        if (index <= currentStatusIndex) {
-          status.completed = true;
-        }
-      });
-    }
+    statusTimeline.forEach((status, index) => {
+      if (index <= currentStatusIndex && currentStatusIndex >= 0) {
+        status.completed = true;
+      }
+    });
 
     res.json({
       success: true,

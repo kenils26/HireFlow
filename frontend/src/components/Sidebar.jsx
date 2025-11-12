@@ -6,12 +6,9 @@ import {
   FaSearch, 
   FaClipboardList, 
   FaVideo, 
-  FaTrophy,
   FaSignOutAlt,
   FaBell,
-  FaEnvelope,
   FaFileAlt,
-  FaQuestionCircle,
   FaUserEdit,
   FaChevronDown
 } from 'react-icons/fa';
@@ -85,7 +82,6 @@ const Sidebar = ({ children }) => {
     { path: '/browse-jobs', label: 'Browse Jobs', icon: FaSearch },
     { path: '/interviews', label: 'Interviews', icon: FaVideo },
     { path: '/resume-parser', label: 'Resume Parser', icon: FaFileAlt },
-    { path: '/results-offers', label: 'Results & Offers', icon: FaTrophy },
   ];
 
   // Recruiter menu items
@@ -94,8 +90,7 @@ const Sidebar = ({ children }) => {
     { path: '/recruiter/jobs', label: 'Jobs', icon: FaBriefcase },
     { path: '/recruiter/applications', label: 'Applications', icon: FaClipboardList },
     { path: '/recruiter/interviews', label: 'Interviews', icon: FaVideo },
-    { path: '/recruiter/test-generator', label: 'Generate Test', icon: FaQuestionCircle },
-    { path: '/recruiter/messages', label: 'Messages', icon: FaEnvelope },
+    { path: '/recruiter/aptitude-tests', label: 'Aptitude Tests', icon: FaFileAlt },
   ];
 
   const menuItems = userRole === 'recruiter' ? recruiterMenuItems : candidateMenuItems;
