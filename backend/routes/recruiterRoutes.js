@@ -41,9 +41,15 @@ const {
   getAptitudeTest,
   deleteAptitudeTest
 } = require('../controllers/aptitudeTestController');
+const {
+  getDashboardStats
+} = require('../controllers/recruiterDashboardController');
 
 // All routes require recruiter role
 router.use(requireRecruiter);
+
+// Dashboard routes
+router.get('/dashboard/stats', getDashboardStats);
 
 // Profile routes
 router.put('/profile', updateRecruiterProfile);

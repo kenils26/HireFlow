@@ -19,6 +19,21 @@ const getJobs = async (req, res) => {
       isActive: true
     };
 
+    // Get candidate's applied jobs if authenticated (needed for filtering expired jobs)
+    let appliedJobIds = [];
+    let candidateId = null;
+    if (req.user && req.user.role === 'candidate') {
+      const candidate = await Candidate.findOne({ where: { userId: req.user.id } });
+      if (candidate) {
+        candidateId = candidate.id;
+        const applications = await JobApplication.findAll({
+          where: { candidateId: candidate.id },
+          attributes: ['jobId']
+        });
+        appliedJobIds = applications.map(app => app.jobId);
+      }
+    }
+
     // Search by title, company, or skills
     if (search) {
       where[Op.or] = [
@@ -65,32 +80,36 @@ const getJobs = async (req, res) => {
       offset: offset
     });
 
-    // Get candidate's saved jobs and applications if authenticated
+    // Get candidate's saved jobs if authenticated
     let savedJobIds = [];
-    let appliedJobIds = [];
-    let candidateId = null;
-
-    if (req.user && req.user.role === 'candidate') {
-      const candidate = await Candidate.findOne({ where: { userId: req.user.id } });
-      if (candidate) {
-        candidateId = candidate.id;
-        
-        const savedJobs = await SavedJob.findAll({
-          where: { candidateId: candidate.id },
-          attributes: ['jobId']
-        });
-        savedJobIds = savedJobs.map(sj => sj.jobId);
-
-        const applications = await JobApplication.findAll({
-          where: { candidateId: candidate.id },
-          attributes: ['jobId']
-        });
-        appliedJobIds = applications.map(app => app.jobId);
-      }
+    if (req.user && req.user.role === 'candidate' && candidateId) {
+      const savedJobs = await SavedJob.findAll({
+        where: { candidateId: candidateId },
+        attributes: ['jobId']
+      });
+      savedJobIds = savedJobs.map(sj => sj.jobId);
     }
 
+    // Filter out expired jobs (unless candidate has applied)
+    const now = new Date();
+    const validJobs = jobs.filter(job => {
+      // If job has no deadline, include it
+      if (!job.applicationDeadline) {
+        return true;
+      }
+      
+      const deadline = new Date(job.applicationDeadline);
+      // If deadline hasn't passed, include it
+      if (deadline >= now) {
+        return true;
+      }
+      
+      // If deadline has passed, only include if candidate has applied
+      return appliedJobIds.includes(job.id);
+    });
+
     // Convert jobs to JSON format
-    const jobsWithStatus = jobs.map(job => {
+    const jobsWithStatus = validJobs.map(job => {
       const jobData = job.toJSON();
       jobData.isSaved = savedJobIds.includes(job.id);
       jobData.isApplied = appliedJobIds.includes(job.id);
@@ -125,10 +144,10 @@ const getJobs = async (req, res) => {
       success: true,
       data: {
         jobs: jobsWithRecommendations,
-        total: count,
+        total: validJobs.length, // Use filtered count instead of all jobs count
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: Math.ceil(count / parseInt(limit)),
+        totalPages: Math.ceil(validJobs.length / parseInt(limit)),
         recommendedCount: candidateId ? jobsWithRecommendations.filter(job => job.isRecommended && job.matchScore > 0).length : 0
       }
     });
@@ -169,14 +188,24 @@ const getJobById = async (req, res) => {
       });
     }
 
+    // Check if job has expired
+    const now = new Date();
+    let isExpired = false;
+    if (job.applicationDeadline) {
+      const deadline = new Date(job.applicationDeadline);
+      isExpired = deadline < now;
+    }
+
     // Get candidate's saved and applied status if authenticated
     let isSaved = false;
     let isApplied = false;
     let application = null;
+    let candidateId = null;
 
     if (req.user && req.user.role === 'candidate') {
       const candidate = await Candidate.findOne({ where: { userId: req.user.id } });
       if (candidate) {
+        candidateId = candidate.id;
         const savedJob = await SavedJob.findOne({
           where: { candidateId: candidate.id, jobId: id }
         });
@@ -186,6 +215,22 @@ const getJobById = async (req, res) => {
           where: { candidateId: candidate.id, jobId: id }
         });
         isApplied = !!application;
+      }
+    }
+
+    // If job is expired, only show it to:
+    // 1. Recruiters (they can see their own jobs)
+    // 2. Candidates who have applied
+    if (isExpired) {
+      const canView = 
+        (req.user && req.user.role === 'recruiter') || // Recruiters can always see
+        (req.user && req.user.role === 'candidate' && isApplied); // Candidates who applied can see
+      
+      if (!canView) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
       }
     }
 
@@ -256,6 +301,18 @@ const applyForJob = async (req, res) => {
         success: false,
         message: 'This job is no longer active'
       });
+    }
+
+    // Check if application deadline has passed
+    if (job.applicationDeadline) {
+      const deadline = new Date(job.applicationDeadline);
+      const now = new Date();
+      if (deadline < now) {
+        return res.status(400).json({
+          success: false,
+          message: 'The application deadline for this job has passed'
+        });
+      }
     }
 
     // Check if already applied

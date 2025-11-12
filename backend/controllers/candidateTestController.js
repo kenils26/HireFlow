@@ -46,6 +46,47 @@ const getTestForJob = async (req, res) => {
       });
     }
 
+    // Get job to check test schedule
+    const job = await Job.findByPk(jobId);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found'
+      });
+    }
+
+    // Check if test is scheduled and if current time is within the allowed period
+    if (job.testDate && job.testStartTime && job.testEndTime) {
+      const now = new Date();
+      const testDate = new Date(job.testDate);
+      const [startHours, startMinutes] = job.testStartTime.split(':').map(Number);
+      const [endHours, endMinutes] = job.testEndTime.split(':').map(Number);
+      
+      const testStartDateTime = new Date(testDate);
+      testStartDateTime.setHours(startHours, startMinutes, 0, 0);
+      
+      const testEndDateTime = new Date(testDate);
+      testEndDateTime.setHours(endHours, endMinutes, 0, 0);
+
+      // Check if current time is before test start
+      if (now < testStartDateTime) {
+        return res.status(400).json({
+          success: false,
+          message: `Test is scheduled for ${job.testDate} between ${job.testStartTime} and ${job.testEndTime}. Please wait until the test window opens.`
+        });
+      }
+
+      // Check if current time is after test end
+      if (now > testEndDateTime) {
+        // Automatically reject the candidate if they missed the test window
+        await application.update({ status: 'Rejected' });
+        return res.status(400).json({
+          success: false,
+          message: `The test window has closed. The test was scheduled for ${job.testDate} between ${job.testStartTime} and ${job.testEndTime}. Your application has been automatically rejected.`
+        });
+      }
+    }
+
     // Get test for this job
     const test = await AptitudeTest.findOne({
       where: { jobId },
@@ -323,6 +364,15 @@ const checkTestAvailability = async (req, res) => {
       });
     }
 
+    // Get job to check test schedule
+    const job = await Job.findByPk(jobId);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found'
+      });
+    }
+
     // Check if test exists
     const test = await AptitudeTest.findOne({
       where: { jobId }
@@ -347,12 +397,54 @@ const checkTestAvailability = async (req, res) => {
       }
     });
 
+    // Check test schedule and availability
+    let canTakeTest = true;
+    let testStatus = 'available';
+    let testMessage = null;
+
+    if (job.testDate && job.testStartTime && job.testEndTime) {
+      const now = new Date();
+      const testDate = new Date(job.testDate);
+      const [startHours, startMinutes] = job.testStartTime.split(':').map(Number);
+      const [endHours, endMinutes] = job.testEndTime.split(':').map(Number);
+      
+      const testStartDateTime = new Date(testDate);
+      testStartDateTime.setHours(startHours, startMinutes, 0, 0);
+      
+      const testEndDateTime = new Date(testDate);
+      testEndDateTime.setHours(endHours, endMinutes, 0, 0);
+
+      if (now < testStartDateTime) {
+        canTakeTest = false;
+        testStatus = 'scheduled';
+        testMessage = `Test is scheduled for ${job.testDate} between ${job.testStartTime} and ${job.testEndTime}`;
+      } else if (now > testEndDateTime) {
+        canTakeTest = false;
+        testStatus = 'expired';
+        testMessage = `Test window has closed. The test was scheduled for ${job.testDate} between ${job.testStartTime} and ${job.testEndTime}`;
+        
+        // Automatically reject if test window has passed and candidate hasn't submitted
+        if (!submission) {
+          await application.update({ status: 'Rejected' });
+        }
+      } else {
+        testStatus = 'available';
+        testMessage = `Test is available now until ${job.testEndTime}`;
+      }
+    }
+
     res.json({
       success: true,
       data: {
         hasTest: true,
         hasApplied: true,
         hasSubmitted: !!submission,
+        canTakeTest: canTakeTest,
+        testStatus: testStatus,
+        testMessage: testMessage,
+        testDate: job.testDate,
+        testStartTime: job.testStartTime,
+        testEndTime: job.testEndTime,
         testId: test.id,
         applicationId: application.id,
         submission: submission ? {

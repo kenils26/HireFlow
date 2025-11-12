@@ -1,4 +1,4 @@
-const { JobApplication, Job, Candidate, Recruiter } = require('../models');
+const { JobApplication, Job, Candidate, Recruiter, JobSkill } = require('../models');
 const { Op } = require('sequelize');
 
 // Get all applications for a candidate
@@ -24,9 +24,15 @@ const getApplications = async (req, res) => {
               model: Recruiter,
               as: 'recruiter',
               attributes: ['id', 'companyName', 'companyLogoUrl']
+            },
+            {
+              model: JobSkill,
+              as: 'skills',
+              attributes: ['id', 'skillName'],
+              required: false
             }
-          ],
-          attributes: ['id', 'title', 'companyName', 'companyLogoUrl', 'location', 'jobType', 'workMode']
+          ]
+          // Include all job fields including test date/time
         }
       ],
       order: [['appliedAt', 'DESC']]

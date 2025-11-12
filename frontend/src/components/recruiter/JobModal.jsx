@@ -18,7 +18,11 @@ const JobModal = ({ job, onClose, onSave }) => {
     benefits: '',
     skills: [],
     companyLogoUrl: '',
-    isActive: true
+    isActive: true,
+    applicationDeadline: '',
+    testDate: '',
+    testStartTime: '',
+    testEndTime: ''
   });
   const [skillInput, setSkillInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -50,7 +54,11 @@ const JobModal = ({ job, onClose, onSave }) => {
           benefits: job.benefits || '',
           skills: job.skills ? job.skills.map(s => s.skillName || s) : [],
           companyLogoUrl: job.companyLogoUrl || '',
-          isActive: job.isActive !== undefined ? job.isActive : true
+          isActive: job.isActive !== undefined ? job.isActive : true,
+          applicationDeadline: job.applicationDeadline ? new Date(job.applicationDeadline).toISOString().split('T')[0] : '',
+          testDate: job.testDate || '',
+          testStartTime: job.testStartTime || '',
+          testEndTime: job.testEndTime || ''
         });
       }
     }
@@ -76,7 +84,11 @@ const JobModal = ({ job, onClose, onSave }) => {
           benefits: jobData.benefits || '',
           skills: jobData.skills ? jobData.skills.map(s => s.skillName || s) : [],
           companyLogoUrl: jobData.companyLogoUrl || '',
-          isActive: jobData.isActive !== undefined ? jobData.isActive : true
+          isActive: jobData.isActive !== undefined ? jobData.isActive : true,
+          applicationDeadline: jobData.applicationDeadline ? new Date(jobData.applicationDeadline).toISOString().split('T')[0] : '',
+          testDate: jobData.testDate || '',
+          testStartTime: jobData.testStartTime || '',
+          testEndTime: jobData.testEndTime || ''
         });
       }
     } catch (error) {
@@ -135,7 +147,11 @@ const JobModal = ({ job, onClose, onSave }) => {
         ...formData,
         salaryMin: formData.salaryMin ? parseFloat(formData.salaryMin) : null,
         salaryMax: formData.salaryMax ? parseFloat(formData.salaryMax) : null,
-        isActive: formData.isActive !== undefined ? formData.isActive : true
+        isActive: formData.isActive !== undefined ? formData.isActive : true,
+        applicationDeadline: formData.applicationDeadline || null,
+        testDate: formData.testDate || null,
+        testStartTime: formData.testStartTime || null,
+        testEndTime: formData.testEndTime || null
       };
 
       let savedJob;
@@ -305,7 +321,77 @@ const JobModal = ({ job, onClose, onSave }) => {
                   <option value="On-site">On-site</option>
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Application Deadline
+                </label>
+                <input
+                  type="date"
+                  name="applicationDeadline"
+                  value={formData.applicationDeadline}
+                  onChange={handleChange}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  After this date, the job will be removed from browse jobs section. Only candidates who have applied can see it.
+                </p>
+              </div>
             </div>
+          </div>
+
+          {/* Test Schedule */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Test Schedule</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Set the date and time window when candidates can take the aptitude test. Candidates can only attempt the test during this period.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Test Date
+                </label>
+                <input
+                  type="date"
+                  name="testDate"
+                  value={formData.testDate}
+                  onChange={handleChange}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Start Time
+                </label>
+                <input
+                  type="time"
+                  name="testStartTime"
+                  value={formData.testStartTime}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  End Time
+                </label>
+                <input
+                  type="time"
+                  name="testEndTime"
+                  value={formData.testEndTime}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Candidates can only take the test between the specified start and end time on the test date. If they miss this window, they will be automatically rejected.
+            </p>
           </div>
 
           {/* Salary */}

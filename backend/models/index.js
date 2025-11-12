@@ -42,7 +42,7 @@ TestSubmission.belongsTo(JobApplication, { foreignKey: 'jobApplicationId', as: '
 const syncDatabase = async (force = false) => {
   try {
     await testConnection();
-    await sequelize.sync({ force, alter: false });
+    await sequelize.sync({ force, alter: true }); // Use alter: true to add new columns
     console.log('Database synchronized successfully.');
   } catch (error) {
     console.error('Error synchronizing database:', error);

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getCurrentUser } from '../services/authService';
 import Sidebar from '../components/Sidebar';
 import CandidateDashboard from './candidate/CandidateDashboard';
+import RecruiterDashboard from './recruiter/RecruiterDashboard';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -41,12 +42,7 @@ const Dashboard = () => {
       {user?.role === 'candidate' ? (
         <CandidateDashboard />
       ) : (
-        <div className="p-6">
-          <div className="bg-white rounded-xl shadow p-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Welcome to your Dashboard</h2>
-            <p className="text-gray-600">Your recruiter dashboard is coming soon!</p>
-          </div>
-        </div>
+        <RecruiterDashboard />
       )}
     </Sidebar>
   );

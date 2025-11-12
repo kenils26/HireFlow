@@ -176,7 +176,11 @@ const createJob = async (req, res) => {
       benefits,
       skills,
       companyLogoUrl,
-      isActive
+      isActive,
+      applicationDeadline,
+      testDate,
+      testStartTime,
+      testEndTime
     } = req.body;
 
     // Validate required fields
@@ -203,7 +207,11 @@ const createJob = async (req, res) => {
       requirements: requirements || null,
       benefits: benefits || null,
       companyLogoUrl: companyLogoUrl || recruiter.companyLogoUrl || null,
-      isActive: isActive !== undefined ? isActive : true
+      isActive: isActive !== undefined ? isActive : true,
+      applicationDeadline: applicationDeadline || null,
+      testDate: testDate || null,
+      testStartTime: testStartTime || null,
+      testEndTime: testEndTime || null
     });
 
     // Add skills if provided
@@ -285,7 +293,11 @@ const updateJob = async (req, res) => {
       benefits,
       skills,
       companyLogoUrl,
-      isActive
+      isActive,
+      applicationDeadline,
+      testDate,
+      testStartTime,
+      testEndTime
     } = req.body;
 
     // Update job fields
@@ -303,6 +315,10 @@ const updateJob = async (req, res) => {
     if (benefits !== undefined) job.benefits = benefits;
     if (companyLogoUrl !== undefined) job.companyLogoUrl = companyLogoUrl;
     if (isActive !== undefined) job.isActive = isActive;
+    if (applicationDeadline !== undefined) job.applicationDeadline = applicationDeadline || null;
+    if (testDate !== undefined) job.testDate = testDate || null;
+    if (testStartTime !== undefined) job.testStartTime = testStartTime || null;
+    if (testEndTime !== undefined) job.testEndTime = testEndTime || null;
 
     await job.save();
 

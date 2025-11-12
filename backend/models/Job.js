@@ -73,6 +73,22 @@ const Job = sequelize.define('Job', {
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  applicationDeadline: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  testDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: true
+  },
+  testStartTime: {
+    type: DataTypes.TIME,
+    allowNull: true
+  },
+  testEndTime: {
+    type: DataTypes.TIME,
+    allowNull: true
   }
 }, {
   tableName: 'jobs',

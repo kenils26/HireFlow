@@ -11,7 +11,8 @@ import {
   FaCheckCircle,
   FaUpload,
   FaFile,
-  FaTimes
+  FaTimes,
+  FaBan
 } from 'react-icons/fa';
 import { getJobById, applyForJob, toggleSaveJob } from '../../services/jobService';
 import { checkTestAvailability } from '../../services/candidateTestService';
@@ -37,6 +38,7 @@ const JobDetails = () => {
   }, [id]);
 
   useEffect(() => {
+    // Load test info if candidate has applied (to check availability and submission status)
     if (job && job.isApplied) {
       loadTestInfo();
     } else if (job && !job.isApplied) {
@@ -285,6 +287,26 @@ const JobDetails = () => {
             </span>
           </div>
 
+          {/* Test Schedule Information */}
+          {job.testDate && job.testStartTime && job.testEndTime && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-sm font-semibold text-blue-900 mb-2">📅 Aptitude Test Schedule</h3>
+              <p className="text-sm text-blue-800">
+                <span className="font-medium">Date:</span> {new Date(job.testDate).toLocaleDateString('en-GB', { 
+                  day: '2-digit', 
+                  month: '2-digit', 
+                  year: 'numeric' 
+                })}
+              </p>
+              <p className="text-sm text-blue-800">
+                <span className="font-medium">Time:</span> {job.testStartTime} - {job.testEndTime}
+              </p>
+              <p className="text-xs text-blue-700 mt-2">
+                ⚠️ You can only take the test during this time window. Missing the test will result in automatic rejection.
+              </p>
+            </div>
+          )}
+
           {job.skills && job.skills.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-4">
               {job.skills.map((skill) => (
@@ -301,24 +323,87 @@ const JobDetails = () => {
           <div className="flex gap-3 flex-wrap">
             {job.isApplied ? (
               <>
-                <button
-                  disabled
-                  className="px-6 py-2 bg-green-100 text-green-700 rounded-lg flex items-center space-x-2 cursor-not-allowed"
-                >
-                  <FaCheckCircle className="w-5 h-5" />
-                  <span>Applied</span>
-                </button>
-                {loadingTestInfo ? (
-                  <div className="px-6 py-2 text-gray-500">Checking test...</div>
-                ) : testInfo && testInfo.hasTest && !testInfo.hasSubmitted && (
+                {job.application?.status === 'Rejected' ? (
                   <button
-                    onClick={() => navigate(`/jobs/${id}/take-test`)}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled
+                    className="px-6 py-2 bg-red-100 text-red-700 rounded-lg flex items-center space-x-2 cursor-not-allowed"
                   >
-                    Take Aptitude Test
+                    <FaBan className="w-5 h-5" />
+                    <span>Application Rejected</span>
+                  </button>
+                ) : job.application?.status === 'Offer' ? (
+                  <button
+                    disabled
+                    className="px-6 py-2 bg-purple-100 text-purple-700 rounded-lg flex items-center space-x-2 cursor-not-allowed"
+                  >
+                    <FaCheckCircle className="w-5 h-5" />
+                    <span>Offer Received</span>
+                  </button>
+                ) : job.application?.status === 'Interview' ? (
+                  <button
+                    disabled
+                    className="px-6 py-2 bg-green-100 text-green-700 rounded-lg flex items-center space-x-2 cursor-not-allowed"
+                  >
+                    <FaCheckCircle className="w-5 h-5" />
+                    <span>Interview Scheduled</span>
+                  </button>
+                ) : job.application?.status === 'Under Review' ? (
+                  <button
+                    disabled
+                    className="px-6 py-2 bg-blue-100 text-blue-700 rounded-lg flex items-center space-x-2 cursor-not-allowed"
+                  >
+                    <FaCheckCircle className="w-5 h-5" />
+                    <span>Under Review</span>
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    className="px-6 py-2 bg-green-100 text-green-700 rounded-lg flex items-center space-x-2 cursor-not-allowed"
+                  >
+                    <FaCheckCircle className="w-5 h-5" />
+                    <span>Applied</span>
                   </button>
                 )}
-                {testInfo && testInfo.hasSubmitted && (
+                {job.application?.status !== 'Rejected' && (
+                  <>
+                    {loadingTestInfo ? (
+                      <div className="px-6 py-2 text-gray-500">Checking test...</div>
+                    ) : testInfo && testInfo.hasTest && !testInfo.hasSubmitted && (
+                      <>
+                        {testInfo.canTakeTest ? (
+                          <button
+                            onClick={() => navigate(`/jobs/${id}/take-test`)}
+                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            Take Aptitude Test
+                          </button>
+                        ) : (
+                          <div className="px-6 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-sm text-yellow-800 font-medium">
+                              {testInfo.testStatus === 'scheduled' && (
+                                <>⏰ {testInfo.testMessage}</>
+                              )}
+                              {testInfo.testStatus === 'expired' && (
+                                <>❌ {testInfo.testMessage}</>
+                              )}
+                              {!testInfo.testStatus && testInfo.testMessage && (
+                                <>{testInfo.testMessage}</>
+                              )}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+                {job.application?.status !== 'Rejected' && testInfo && testInfo.hasTest && testInfo.testStatus === 'available' && !testInfo.hasSubmitted && (
+                  <div className="px-6 py-2 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      ✅ {testInfo.testMessage || 'Test is available now'}
+                    </p>
+                  </div>
+                )}
+                {job.application?.status !== 'Rejected' && testInfo && testInfo.hasSubmitted && (
                   <button
                     onClick={() => navigate(`/jobs/${id}/test-result`)}
                     className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
