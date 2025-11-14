@@ -128,7 +128,6 @@ Frontend runs on:
 
 # 📸 **Screenshots**
 
-Add your screenshots inside the `/screenshots` folder:
 
 #### **Home Page**
 
