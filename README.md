@@ -25,7 +25,6 @@ The platform includes **full Role-Based Access Control (RBAC)** and a clean, car
 
 * Secure route protection for:
 
-  * **Admin**
   * **Recruiter**
   * **Candidate**
 
