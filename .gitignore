@@ -17,8 +17,15 @@ node_modules/
 /dist
 /build
 
-# Uploads (user-generated content)
-backend/uploads/
+# Uploads (user-generated content) - ignore files but keep folder structure
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Seeders
+backend/seeders/
+
+# Test files
+backend/test/
 
 # Logs
 *.log
