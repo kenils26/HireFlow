@@ -55,8 +55,7 @@ The platform includes **full Role-Based Access Control (RBAC)** and a clean, car
 ## **1️⃣ Clone the Repository**
 
 ```bash
-git clone https://github.com/your-username/your-repo-name.git
-cd your-repo-name
+git clone https://github.com/kenils26/HireFlow.git
 ```
 
 ---
@@ -157,27 +156,7 @@ Add your screenshots inside the `/screenshots` folder:
 
 ---
 
-# 🧩 **Environment Variables**
 
-`.env.example` file includes all required variables:
-
-```
-PORT=5000
-NODE_ENV=development
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=fig_hiring_platform
-DB_USER=postgres
-DB_PASSWORD=your_postgres_password
-JWT_SECRET=your_jwt_secret_here
-JWT_EXPIRE=7d
-UPLOAD_DIR=./uploads
-MAX_FILE_SIZE=10485760
-FRONTEND_URL=http://localhost:3000
-GEMINI_API_KEY=your_gemini_api_key_here
-```
-
----
 
 # 🚀 **Project Status**
 
@@ -187,11 +166,12 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ✔️ PostgreSQL + Sequelize integrated
 ✔️ Card-based UI functional
 
-🔧 **Upcoming Enhancements**
+🔧 **Possible Upcoming Enhancements**
 
 * Improved UI/UX
 * Email notifications
-* Recruiter analytics dashboard
+* Interview Call Integration (Audio/Video)
+* Built-In Code Editor for Assessments
 
 ---
 
